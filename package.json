@@ -1,18 +1,17 @@
 {
-  "name": "extract-pg-schema",
+  "name": "pg-extract",
   "version": "5.3.5",
   "keywords": [
     "postgresql",
     "schema"
   ],
-  "repository": "git@github.com:kristiandupont/extract-pg-schema.git",
+  "repository": "git@github.com:feathers-studio/pg-extract.git",
   "license": "MIT",
   "author": {
-    "name": "Kristian Dupont",
-    "url": "http://www.kristiandupont.com"
+    "name": "Feathers Studio",
+    "url": "https://feathers.studio"
   },
-  "main": "build/index.js",
-  "types": "build/index.d.ts",
+  "main": "src/index.ts",
   "bin": {
     "extract-pg-schema": "bin/extract-pg-schema"
   },
