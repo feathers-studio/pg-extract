@@ -52,3 +52,4 @@ export type {
   ViewDetails,
 } from "./kinds/extractView";
 export type { Kind, default as PgType } from "./kinds/PgType";
+export { canonicaliseTypes } from "./kinds/query-parts/canonicaliseType";
