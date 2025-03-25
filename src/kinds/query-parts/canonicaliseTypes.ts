@@ -1,25 +1,96 @@
 import { type Knex } from "knex";
 
-export const canonicaliseTypes = async (db: Knex, types: string[]) => {
-  const placeholders = types.map(() => "(?)").join(", ");
+export namespace CanonicalType {
+  export enum TypeKind {
+    Base = "base",
+    Composite = "composite",
+    Domain = "domain",
+    Enum = "enum",
+    Range = "range",
+    Pseudo = "pseudo",
+    Unknown = "unknown",
+  }
 
-  const resolved = await db.raw(
-    `
+  export interface Abstract {
+    original_type: string;
+    canonical_name: string;
+    schema: string;
+    name: string;
+    type_kind: TypeKind;
+    dimensions: number;
+    modifiers: string;
+  }
+
+  export interface Base extends Abstract {
+    type_kind: TypeKind.Base;
+  }
+
+  export interface Enum extends Abstract {
+    type_kind: TypeKind.Enum;
+    enum_values: string[];
+  }
+
+  export interface Composite extends Abstract {
+    type_kind: TypeKind.Composite;
+    attributes: {
+      name: string;
+      number: number;
+      type_oid: number;
+      type_name: string;
+    }[];
+  }
+
+  export interface Domain extends Abstract {
+    type_kind: TypeKind.Domain;
+    domain_base_type: {
+      canonical_name: string;
+      schema: string;
+      name: string;
+    };
+  }
+
+  export interface Range extends Abstract {
+    type_kind: TypeKind.Range;
+    range_subtype: string | null;
+  }
+
+  export interface Pseudo extends Abstract {
+    type_kind: TypeKind.Pseudo;
+  }
+}
+export type CanonicalType =
+  | CanonicalType.Base
+  | CanonicalType.Enum
+  | CanonicalType.Composite
+  | CanonicalType.Domain
+  | CanonicalType.Range
+  | CanonicalType.Pseudo;
+
+export const canonicaliseTypes = async (
+  db: Knex,
+  types: string[],
+): Promise<CanonicalType[]> => {
+  if (types.length === 0) return [];
+
+  const placeholders = types.map((_, i) => `(?, ${i})`).join(", ");
+
+  const query = `
       WITH RECURSIVE 
-      -- Parameters (change this value to the type you want to canonicalize)
-      input(type_name) AS (
-          VALUES (${placeholders})
+      -- Parameters with sequence numbers to preserve order
+      input(type_name, seq) AS (
+          VALUES ${placeholders}
       ),
       -- Parse array dimensions and base type
       type_parts AS (
           SELECT
               type_name,
+              seq,
               CASE 
-                  WHEN type_name ~ '\(.*\)' THEN regexp_replace(type_name, '\(.*\)', '')
+                  WHEN type_name ~ '\\(.*\\)' THEN regexp_replace(type_name, '\\(.*\\)', '')
                   ELSE type_name
               END AS clean_type,
               CASE 
-                  WHEN type_name ~ '\(.*\)' THEN substring(type_name from '\((.*)\)')
+                  WHEN type_name ~ '\\(.*\\)' THEN substring(type_name from '\\((.*\\?)\\)')
                   ELSE NULL
               END AS modifiers
           FROM input
@@ -27,19 +98,21 @@ export const canonicaliseTypes = async (db: Knex, types: string[]) => {
       array_dimensions AS (
           SELECT
               type_name,
+              seq,
               modifiers,
               CASE 
-                  WHEN clean_type ~ '.*\[\].*' THEN 
-                      (length(clean_type) - length(regexp_replace(clean_type, '\[\]', '', 'g'))) / 2
+                  WHEN clean_type ~ '.*\\[\\].*' THEN 
+                      (length(clean_type) - length(regexp_replace(clean_type, '\\[\\]', '', 'g'))) / 2
                   ELSE 0
               END AS dimensions,
-              regexp_replace(clean_type, '\[\]', '', 'g') AS base_type_name
+              regexp_replace(clean_type, '\\[\\]', '', 'g') AS base_type_name
           FROM type_parts
       ),
       -- Get base type information
       base_type_info AS (
           SELECT
               a.type_name,
+              a.seq,
               a.modifiers,
               a.dimensions,
               t.oid AS type_oid,
@@ -78,12 +151,15 @@ export const canonicaliseTypes = async (db: Knex, types: string[]) => {
                   jsonb_build_object(
                       'name', a.attname,
                       'number', a.attnum,
-                      'type_oid', a.atttypid
+                      'type_oid', a.atttypid,
+                      'type_name', format_type(a.atttypid, null)
                   )
                   ORDER BY a.attnum
               ) AS attributes
           FROM base_type_info b
-          JOIN pg_attribute a ON b.type_oid = a.attrelid
+          JOIN pg_type t ON t.oid = b.type_oid
+          JOIN pg_class c ON c.oid = t.typrelid
+          JOIN pg_attribute a ON a.attrelid = c.oid
           WHERE b.type_kind_code = 'c' AND a.attnum > 0 AND NOT a.attisdropped
           GROUP BY b.type_name
       ),
@@ -162,42 +238,20 @@ export const canonicaliseTypes = async (db: Knex, types: string[]) => {
               WHEN b.type_kind_code = 'r' THEN r.subtype_name
               ELSE NULL
           END
-      ) AS type_info
+      ) AS type_info,
+      b.seq
       FROM base_type_info b
       LEFT JOIN enum_values e ON b.type_name = e.type_name
       LEFT JOIN composite_attributes c ON b.type_name = c.type_name
       LEFT JOIN domain_base_types d ON b.type_name = d.original_type
-      LEFT JOIN range_subtypes r ON b.type_name = r.type_name;
-    `,
-    types,
-  );
+      LEFT JOIN range_subtypes r ON b.type_name = r.type_name
+      ORDER BY b.seq;
+    `;
 
-  return resolved as {
-    canonical_name: string;
-    schema: string;
-    name: string;
-    type_kind:
-      | "base"
-      | "composite"
-      | "domain"
-      | "enum"
-      | "range"
-      | "pseudo"
-      | "unknown";
-    dimensions: number;
-    original_type: string;
-    modifiers: string;
-    enum_values: string[];
-    attributes: {
-      name: string;
-      number: number;
-      type_oid: number;
-    }[];
-    domain_base_type: {
-      canonical_name: string;
-      schema: string;
-      name: string;
-    } | null;
-    range_subtype: string | null;
-  }[];
+  interface Resolved {
+    type_info: CanonicalType;
+  }
+
+  const resolved = (await db.raw(query, types)).rows as Resolved[];
+  return resolved.map((each) => each.type_info);
 };
