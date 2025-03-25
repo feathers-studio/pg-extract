@@ -1,5 +1,6 @@
 export type { ExtractSchemaOptions, Schema } from "./extractSchemas";
 export { Extractor } from "./extractSchemas";
+export type { CanonicalType } from "./kinds/query-parts/canonicaliseTypes";
 export type { default as InformationSchemaColumn } from "./information_schema/InformationSchemaColumn";
 export type { default as InformationSchemaDomain } from "./information_schema/InformationSchemaDomain";
 export type { default as InformationSchemaRoutine } from "./information_schema/InformationSchemaRoutine";
