@@ -1,33 +1,11 @@
 import type { Knex } from "knex";
 
 import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine";
-import { parsePostgresArray } from "./parsePostgresArray";
 import type PgType from "./PgType";
-import type { TableColumnType } from "./extractTable";
-
-export type FunctionReturnType = TableColumnType & {
-  /**
-   * Whether the function returns a set of values (multiple rows).
-   */
-  isSet: boolean;
-  /**
-   * Whether the function's return type is an array.
-   */
-  isArray: boolean;
-  /**
-   * Number of dimensions if the return type is an array, 0 otherwise.
-   */
-  dimensions: number;
-  /**
-   * For table/composite returns, contains the column definitions
-   */
-  columns?: TableColumn[];
-  /**
-   * Indicates if this is a table return type
-   */
-  isTable?: boolean;
-};
-
+import {
+  canonicaliseTypes,
+  CanonicalType as CanonicalType,
+} from "./query-parts/canonicaliseTypes";
 const parameterModeMap = {
   i: "IN",
   o: "OUT",
@@ -38,10 +16,11 @@ const parameterModeMap = {
 
 type ParameterMode = (typeof parameterModeMap)[keyof typeof parameterModeMap];
 
+const INPUT_MODES = ["i", "b", "v"] as (keyof typeof parameterModeMap)[];
+
 export type FunctionParameter = {
   name: string;
-  type: string;
-  typeInfo: TableColumnType;
+  type: CanonicalType;
   mode: ParameterMode;
   hasDefault: boolean;
   ordinalPosition: number;
@@ -64,27 +43,31 @@ const parallelSafetyMap = {
 type FunctionParallelSafety =
   (typeof parallelSafetyMap)[keyof typeof parallelSafetyMap];
 
-interface TableColumn {
-  name: string;
-  type: string;
-  typeInfo: TableColumnType;
+enum FunctionReturnTypeKind {
+  Table = "table",
+  Regular = "regular",
 }
 
-interface TableReturnType {
-  type: "table";
-  columns: TableColumn[];
-}
+type FunctionReturnType =
+  | {
+      kind: FunctionReturnTypeKind.Table;
+      columns: { name: string; type: CanonicalType }[];
+      isSet: boolean;
+    }
+  | {
+      kind: FunctionReturnTypeKind.Regular;
+      type: CanonicalType;
+      isSet: boolean;
+    };
 
 export interface FunctionDetails extends PgType<"function"> {
   parameters: FunctionParameter[];
-  returnType: string | TableReturnType;
-  returnTypeInfo: FunctionReturnType;
+  returnType: FunctionReturnType;
   language: string;
   definition: string;
   isStrict: boolean;
   isSecurityDefiner: boolean;
   isLeakProof: boolean;
-  returnsSet: boolean;
   volatility: FunctionVolatility;
   parallelSafety: FunctionParallelSafety;
   estimatedCost: number;
@@ -105,10 +88,9 @@ async function extractFunction(
     })
     .select("*");
 
-  const { rows } = await db.raw(
-    `
+  const query = `
     SELECT
-      p.proname,
+      p.proname as name,
       ns.nspname || '.' || t.typname AS return_type,
       l.lanname AS language,
       p.prosrc AS definition,
@@ -116,51 +98,21 @@ async function extractFunction(
       p.prosecdef AS is_security_definer,
       p.proleakproof AS is_leak_proof,
       p.proretset AS returns_set,
-      p.provolatile,
-      p.proparallel,
+      p.provolatile AS volatility,
+      p.proparallel AS parallel_safety,
       p.procost AS estimated_cost,
       CASE WHEN p.proretset THEN p.prorows ELSE NULL END AS estimated_rows,
       d.description AS comment,
-      p.proargmodes,
-      p.proargnames,
       p.prorettype,
-      array_to_string(COALESCE(p.proallargtypes::regtype[], p.proargtypes::regtype[]), ',') AS arg_types,
-      (
-        SELECT json_agg(json_build_object(
-          'fullName', nsp.nspname || '.' || typ.typname,
-          'kind', CASE 
-            WHEN typ.typtype = 'd' THEN 'domain'
-            WHEN typ.typtype = 'r' THEN 'range'
-            WHEN typ.typtype = 'c' THEN 'composite'
-            WHEN typ.typtype = 'e' THEN 'enum'
-            WHEN typ.typtype = 'b' THEN 'base'
-            ELSE 'base'
-          END
-        ) ORDER BY a.ord)
-        FROM unnest(COALESCE(p.proallargtypes, p.proargtypes)) WITH ORDINALITY AS a(oid, ord)
-        JOIN pg_type typ ON a.oid = typ.oid
-        JOIN pg_namespace nsp ON typ.typnamespace = nsp.oid
-      ) AS arg_type_info,
-      p.pronargdefaults,
+      p.proargnames as arg_names,
+      array_to_json(p.proargmodes) AS arg_modes,
+      array_to_json(COALESCE(p.proallargtypes::regtype[], p.proargtypes::regtype[])) AS arg_types,
+      pronargs,
+      p.pronargdefaults as default_arg_count,
+      p.proargdefaults as arg_defaults,
       pg_get_function_arguments(p.oid) AS arg_list,
       pg_get_function_identity_arguments(p.oid) AS identity_args,
       pg_get_function_result(p.oid) as full_return_type,
-      (
-        SELECT json_build_object(
-          'fullName', nsp.nspname || '.' || typ.typname,
-          'kind', CASE 
-            WHEN typ.typtype = 'd' THEN 'domain'
-            WHEN typ.typtype = 'r' THEN 'range'
-            WHEN typ.typtype = 'c' THEN 'composite'
-            WHEN typ.typtype = 'e' THEN 'enum'
-            WHEN typ.typtype = 'b' THEN 'base'
-            ELSE 'base'
-          END
-        )
-        FROM pg_type typ
-        JOIN pg_namespace nsp ON typ.typnamespace = nsp.oid
-        WHERE typ.oid = p.prorettype
-      ) AS return_type_info,
       (t.typelem != 0) AS returns_array,
       COALESCE(t.typndims, 0) AS return_dimensions,
       t.typelem
@@ -170,231 +122,135 @@ async function extractFunction(
     LEFT JOIN pg_language l ON l.oid = p.prolang
     LEFT JOIN pg_type t ON t.oid = p.prorettype
     LEFT JOIN pg_namespace ns ON t.typnamespace = ns.oid
-    WHERE n.nspname = ? AND p.proname = ?`,
-    [pgType.schemaName, pgType.name],
-  );
+    WHERE n.nspname = ? AND p.proname = ?
+  `;
 
-  return Promise.all(
-    (rows as any[]).map(async (row) => {
-      const argTypes = (
-        row.arg_types ? row.arg_types.split(",") : []
-      ) as string[];
+  const { rows } = (await db.raw(query, [pgType.schemaName, pgType.name])) as {
+    rows: {
+      name: string;
+      language: string;
+      definition: string;
+      is_strict: boolean;
+      is_security_definer: boolean;
+      is_leak_proof: boolean;
+      volatility: "i" | "s" | "v";
+      parallel_safety: "s" | "r" | "u";
+      estimated_cost: number;
+      estimated_rows: number | null;
+      comment: string | null;
+      prorettype: string;
+      arg_names: string[] | null;
+      arg_modes: ("i" | "o" | "b" | "v" | "t")[] | null;
+      arg_types: string[] | null;
+      default_arg_count: number;
+      arg_defaults: string | null;
+      arg_list: string;
+      identity_args: string;
+      return_type: string;
+      full_return_type: string;
+      returns_array: boolean;
+      returns_set: boolean;
+      return_dimensions: number;
+      typelem: number;
+    }[];
+  };
 
-      const paramModes = row.proargmodes
-        ? parsePostgresArray(String(row.proargmodes))
-        : argTypes.map(() => "i");
+  const functions = Promise.all(
+    rows.map(async (row) => {
+      if (row.arg_names && !row.arg_modes)
+        row.arg_modes = row.arg_names.map(() => "i");
 
-      const paramNames = row.proargnames
-        ? parsePostgresArray(String(row.proargnames))
-        : argTypes.map((_, i) => `$${i + 1}`);
+      const argModes =
+        row.arg_modes?.map((mode) => parameterModeMap[mode]) ?? [];
+      const canonical_arg_types = row.arg_types
+        ? await canonicaliseTypes(db, row.arg_types)
+        : [];
 
-      const argTypeInfo = row.arg_type_info ?? [];
+      const firstOutParamIndex =
+        row.arg_modes?.findIndex((mode) => mode === "o") ?? -1;
 
-      const parameters: FunctionParameter[] = argTypes.map(
-        (type: string, i: number) => ({
-          name: paramNames[i],
-          type: type,
-          typeInfo: argTypeInfo[i],
-          mode: parameterModeMap[
-            paramModes[i] as keyof typeof parameterModeMap
-          ],
-          hasDefault: i >= argTypes.length - (row.pronargdefaults || 0),
-          ordinalPosition: i + 1,
-        }),
+      let returnType: FunctionReturnType;
+
+      const tableMatch = (row.full_return_type as string).match(
+        /TABLE\((.*)\)/i,
       );
+      if (tableMatch) {
+        const columnDefs = tableMatch[1].split(",").map((col) => {
+          const [name, type] = col.trim().split(/\s+/);
+          return { name, type };
+        });
 
-      let returnType: string | TableReturnType = row.return_type;
-      let returnTypeInfo: FunctionReturnType = {
-        ...(row.return_type_info || {
-          fullName: row.return_type || "",
-          kind: "base",
-        }),
-        isSet: row.returns_set,
-        isArray: row.returns_array || false,
-        dimensions: row.return_dimensions || 0,
-      };
-
-      if (
-        row.full_return_type &&
-        row.full_return_type.toLowerCase().includes("table")
-      ) {
-        const tableMatch = (row.full_return_type as string).match(
-          /TABLE\((.*)\)/i,
+        const column_types = await canonicaliseTypes(
+          db,
+          columnDefs.map((col) => col.type),
         );
-        if (tableMatch) {
-          // Parse column definitions from the RETURNS TABLE(...) syntax
-          const columnDefs = tableMatch[1].split(",").map((col) => {
-            const [name, typeStr] = col.trim().split(/\s+/);
-            return { name, type: typeStr };
-          });
 
-          try {
-            // For functions with RETURNS TABLE, the column types are specified in the function definition
-            // We need to look up the type information for each column type string
-            const enhancedColumnDefs = await Promise.all(
-              columnDefs.map(async (col) => {
-                try {
-                  // Clean up the type name (remove size parameters, etc.)
-                  let baseType = col.type
-                    .replace(/\[\]$/, "") // Remove array notation
-                    .replace(/\(\d+(?:,\d+)?\)/, "") // Remove size parameters like varchar(255) or numeric(10,2)
-                    .toLowerCase();
-
-                  // Special case handling for common type names with schema prefixes
-                  if (!baseType.includes(".")) {
-                    // Most types are in pg_catalog schema if not explicitly prefixed
-                    baseType = `pg_catalog.${baseType}`;
-                  }
-
-                  const { rows: typeInfoRows } = await db.raw(
-                    `
-                    SELECT 
-                      t.typname AS name,
-                      n.nspname AS schema,
-                      json_build_object(
-                        'fullName', n.nspname || '.' || t.typname,
-                        'kind', CASE 
-                          WHEN t.typtype = 'd' THEN 'domain'
-                          WHEN t.typtype = 'r' THEN 'range'
-                          WHEN t.typtype = 'c' THEN 'composite'
-                          WHEN t.typtype = 'e' THEN 'enum'
-                          WHEN t.typtype = 'b' THEN 'base'
-                          ELSE 'base'
-                        END
-                      ) AS type_info
-                    FROM pg_type t
-                    JOIN pg_namespace n ON t.typnamespace = n.oid
-                    WHERE format_type(t.oid, NULL) = $1
-                       OR n.nspname || '.' || t.typname = $2
-                    LIMIT 1;
-                  `,
-                    [baseType, baseType],
-                  );
-
-                  // If we found type info, use it
-                  if (typeInfoRows && typeInfoRows.length > 0) {
-                    return {
-                      name: col.name,
-                      type: col.type,
-                      typeInfo: typeInfoRows[0].type_info,
-                    };
-                  }
-
-                  // Fallback: try just the type name without schema
-                  const typeName = baseType.split(".").pop() || baseType;
-                  const { rows: fallbackRows } = await db.raw(
-                    `
-                    SELECT 
-                      t.typname AS name,
-                      n.nspname AS schema,
-                      json_build_object(
-                        'fullName', n.nspname || '.' || t.typname,
-                        'kind', CASE 
-                          WHEN t.typtype = 'd' THEN 'domain'
-                          WHEN t.typtype = 'r' THEN 'range'
-                          WHEN t.typtype = 'c' THEN 'composite'
-                          WHEN t.typtype = 'e' THEN 'enum'
-                          WHEN t.typtype = 'b' THEN 'base'
-                          ELSE 'base'
-                        END
-                      ) AS type_info
-                    FROM pg_type t
-                    JOIN pg_namespace n ON t.typnamespace = n.oid
-                    WHERE t.typname = $1
-                    ORDER BY n.nspname = 'pg_catalog' DESC
-                    LIMIT 1;
-                  `,
-                    [typeName],
-                  );
-
-                  return {
-                    name: col.name,
-                    type: col.type,
-                    typeInfo: fallbackRows[0]?.type_info || {
-                      fullName: `pg_catalog.${typeName}`,
-                      kind: "base",
-                    },
-                  };
-                } catch (e) {
-                  // If type lookup fails, provide a sensible default
-                  return {
-                    name: col.name,
-                    type: col.type,
-                    typeInfo: {
-                      fullName: `pg_catalog.${col.type}`,
-                      kind: "base",
-                    },
-                  };
-                }
-              }),
-            );
-
-            returnType = {
-              type: "table",
-              columns: enhancedColumnDefs,
-            };
-
-            returnTypeInfo = {
-              ...returnTypeInfo,
-              kind: "composite",
-              isTable: true,
-              columns: enhancedColumnDefs,
-            };
-          } catch (error) {
-            // Fallback to basic column definitions if the lookup fails
-            console.warn(
-              "Could not fetch detailed column type information, falling back to basic column definitions:",
-              error,
-            );
-
-            const basicColumns = columnDefs.map((col) => ({
-              name: col.name,
-              type: col.type,
-              typeInfo: {
-                fullName: `pg_catalog.${col.type.toLowerCase()}`,
-                kind: "base",
-              },
-            }));
-
-            returnType = {
-              type: "table",
-              columns: basicColumns,
-            };
-
-            returnTypeInfo = {
-              ...returnTypeInfo,
-              kind: "composite",
-              isTable: true,
-              columns: basicColumns,
-            };
-          }
-        }
+        returnType = {
+          kind: FunctionReturnTypeKind.Table,
+          columns: columnDefs.map((col, i) => ({
+            name: col.name,
+            type: column_types[i],
+          })),
+          isSet: row.returns_set,
+        };
+      } else {
+        returnType = {
+          kind: FunctionReturnTypeKind.Regular,
+          type: (await canonicaliseTypes(db, [row.return_type]))[0],
+          isSet: row.returns_set,
+        };
       }
 
-      return {
-        ...pgType,
-        parameters,
-        returnType,
-        returnTypeInfo,
-        language: row.language,
+      // Filter to include IN, INOUT, and VARIADIC parameters as input parameters
+      const inputParams =
+        row.arg_modes
+          ?.map((mode, index) => ({ mode, index }))
+          .filter((item) => INPUT_MODES.includes(item.mode))
+          .map((item) => item.index) ?? [];
+
+      const parameters =
+        row.arg_names?.map((name, i): FunctionParameter => {
+          const isInputParam = INPUT_MODES.includes(row.arg_modes?.[i]!);
+          const inputParamIndex = inputParams.indexOf(i);
+          // Only input parameters can have defaults, and defaults are assigned to the rightmost arguments
+          const hasDefault =
+            isInputParam &&
+            inputParamIndex >=
+              inputParams.length - (row.default_arg_count ?? 0);
+
+          return {
+            name,
+            type: canonical_arg_types[i],
+            mode: argModes[i],
+            hasDefault,
+            ordinalPosition: i + 1,
+          };
+        }) ?? [];
+
+      const func: FunctionDetails = {
+        name: row.name,
+        schemaName: pgType.schemaName,
+        kind: "function",
+        comment: row.comment,
         definition: row.definition,
+        estimatedCost: row.estimated_cost,
+        estimatedRows: row.estimated_rows,
+        language: row.language,
         isStrict: row.is_strict,
         isSecurityDefiner: row.is_security_definer,
         isLeakProof: row.is_leak_proof,
-        returnsSet: row.returns_set,
-        volatility: volatilityMap[
-          row.provolatile as keyof typeof volatilityMap
-        ] as FunctionVolatility,
-        parallelSafety: parallelSafetyMap[
-          row.proparallel as keyof typeof parallelSafetyMap
-        ] as FunctionParallelSafety,
-        estimatedCost: row.estimated_cost,
-        estimatedRows: row.estimated_rows,
-        comment: row.comment,
-        informationSchemaValue,
+        parameters,
+        volatility: volatilityMap[row.volatility],
+        parallelSafety: parallelSafetyMap[row.parallel_safety],
+        returnType,
+        informationSchemaValue: informationSchemaValue,
       };
+
+      return func;
     }),
   );
+
+  return functions;
 }
 
 export default extractFunction;
