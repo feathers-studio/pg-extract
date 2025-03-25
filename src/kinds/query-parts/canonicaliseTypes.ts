@@ -30,13 +30,29 @@ export namespace CanonicalType {
     enum_values: string[];
   }
 
+  // Enhanced attribute with additional metadata
+  export interface CompositeAttribute {
+    name: string;
+    index: number;
+    type: CanonicalType;
+    comment: string | null;
+    defaultValue: any;
+    isNullable: boolean;
+    /**
+     * Whether the attribute is an identity attribute.
+     */
+    isIdentity: boolean;
+    /**
+     * Behavior of the generated attribute. "ALWAYS" if always generated,
+     * "NEVER" if never generated, "BY DEFAULT" if generated when a value
+     * is not provided.
+     */
+    generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
+  }
+
   export interface Composite extends Abstract {
     kind: TypeKind.Composite;
-    attributes: {
-      name: string;
-      index: number;
-      type: CanonicalType;
-    }[];
+    attributes: CompositeAttribute[];
   }
 
   export interface Domain extends Abstract {
@@ -142,7 +158,7 @@ export const canonicaliseTypes = async (
           WHERE b.type_kind_code = 'e'
           GROUP BY b.type_name
       ),
-      -- Handle attributes for composite types
+      -- Enhanced composite attributes with additional metadata
       composite_attributes AS (
           SELECT
               b.type_name,
@@ -151,7 +167,17 @@ export const canonicaliseTypes = async (
                       'name', a.attname,
                       'index', a.attnum,
                       'type_oid', a.atttypid,
-                      'type_name', format_type(a.atttypid, null)
+                      'type_name', format_type(a.atttypid, null),
+                      'comment', col_description(c.oid, a.attnum::int),
+                      'defaultValue', pg_get_expr(d.adbin, d.adrelid),
+                      'isNullable', NOT a.attnotnull,
+                      'isIdentity', a.attidentity IS NOT NULL AND a.attidentity != '',
+                      'generated', CASE 
+                          WHEN a.attidentity = 'a' THEN 'ALWAYS'
+                          WHEN a.attidentity = 'd' THEN 'BY DEFAULT'
+                          WHEN a.attgenerated = 's' THEN 'ALWAYS'
+                          ELSE 'NEVER'
+                      END
                   )
                   ORDER BY a.attnum
               ) AS attributes
@@ -159,6 +185,7 @@ export const canonicaliseTypes = async (
           JOIN pg_type t ON t.oid = b.type_oid
           JOIN pg_class c ON c.oid = t.typrelid
           JOIN pg_attribute a ON a.attrelid = c.oid
+          LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum
           WHERE b.type_kind_code = 'c' AND a.attnum > 0 AND NOT a.attisdropped
           GROUP BY b.type_name
       ),
@@ -257,6 +284,11 @@ export const canonicaliseTypes = async (
             index: number;
             type_oid: number;
             type_name: string;
+            comment: string | null;
+            defaultValue: any;
+            isNullable: boolean;
+            isIdentity: boolean;
+            generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
           }[];
         });
   }
@@ -270,13 +302,18 @@ export const canonicaliseTypes = async (
           const types = each.attributes.map((each) => each.type_name);
           const canonical = await canonicaliseTypes(db, types);
 
-          const attributes: CanonicalType.Composite["attributes"] =
+          const attributes: CanonicalType.CompositeAttribute[] =
             await Promise.all(
               each.attributes.map(async (each, index) => {
                 return {
                   name: each.name,
                   index: each.index,
                   type: canonical[index],
+                  comment: each.comment,
+                  defaultValue: each.defaultValue,
+                  isNullable: each.isNullable,
+                  isIdentity: each.isIdentity,
+                  generated: each.generated,
                 };
               }),
             );
