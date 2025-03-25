@@ -5,6 +5,10 @@ import type InformationSchemaTable from "../information_schema/InformationSchema
 import type PgType from "./PgType";
 import commentMapQueryPart from "./query-parts/commentMapQueryPart";
 import indexMapQueryPart from "./query-parts/indexMapQueryPart";
+import {
+  CanonicalType,
+  canonicaliseTypes,
+} from "./query-parts/canonicaliseTypes";
 
 export const updateActionMap = {
   a: "NO ACTION",
@@ -62,20 +66,6 @@ export type Index = {
 };
 
 /**
- * Column type in a table.
- */
-export type TableColumnType = {
-  /**
-   * Qualified name of the type.
-   */
-  fullName: string;
-  /**
-   * Kind of the type.
-   */
-  kind: "base" | "range" | "domain" | "composite" | "enum";
-};
-
-/**
  * Check constraint on a table.
  */
 export interface TableCheck {
@@ -97,65 +87,54 @@ export interface TableColumn {
    * Column name.
    */
   name: string;
+
   /**
-   * Expanded type name. If the type is an array, brackets will be appended
-   * to the type name.
+   * Fully-detailed canonical type information
    */
-  expandedType: string;
-  /**
-   * Type information.
-   */
-  type: TableColumnType;
+  type: CanonicalType;
+
   /**
    * Comment on the column.
    */
   comment: string | null;
+
   /**
    * Default value of the column.
    */
   defaultValue: any;
-  /**
-   * Whether the column is an array.
-   */
-  isArray: boolean;
-  /**
-   * Number of dimensions of the array type. 0 if not an array.
-   */
-  dimensions: number;
+
   /**
    * Array of references from this column.
    */
   references: ColumnReference[];
-  /** @deprecated use references instead */
-  reference: ColumnReference | null;
-  /** @deprecated use TableDetails.indices instead */
-  indices: Index[];
-  /**
-   * Maximum length of the column.
-   */
-  maxLength: number | null;
+
   /**
    * Whether the column is nullable.
    */
   isNullable: boolean;
+
   /**
    * Whether the column is a primary key.
    */
   isPrimaryKey: boolean;
+
   /**
    * Behavior of the generated column. "ALWAYS" if always generated,
    * "NEVER" if never generated, "BY DEFAULT" if generated when value
    * is not provided.
    */
   generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
+
   /**
    * Whether the column is updatable.
    */
   isUpdatable: boolean;
+
   /**
    * Whether the column is an identity column.
    */
   isIdentity: boolean;
+
   /**
    * Ordinal position of the column in the table. Starts from 1.
    */
@@ -320,36 +299,6 @@ const referenceMapQueryPart = `
         source_attr.attname
 `;
 
-const typeMapQueryPart = `
-select
-  pg_attribute.attname as "column_name",
-  typnamespace::regnamespace::text||'.'||substring(typname, (case when attndims > 0 then 2 else 1 end))::text||repeat('[]', attndims) as "expanded_name",
-  attndims as "dimensions",
-  json_build_object(
-	  'fullName', typnamespace::regnamespace::text||'.'||substring(typname, (case when attndims > 0 then 2 else 1 end))::text,
-    'kind', case 
-      when typtype = 'd' then 'domain'
-      when typtype = 'r' then 'range'
-      when typtype = 'c' then 'composite'
-      when typtype = 'e' then 'enum'
-      when typtype = 'b' then COALESCE((select case 
-        when i.typtype = 'r' then 'range' 
-        when i.typtype = 'd' then 'domain' 
-        when i.typtype = 'c' then 'composite' 
-        when i.typtype = 'e' then 'enum' 
-      end as inner_kind from pg_type i where i.oid = t.typelem), 'base')
-    ELSE 'unknown'
-    end
-  ) as "type_info"
-from pg_type t
-join pg_attribute on pg_attribute.atttypid = t.oid
-join pg_class on pg_attribute.attrelid = pg_class.oid
-join pg_namespace on pg_class.relnamespace = pg_namespace.oid
-WHERE
-  pg_namespace.nspname = :schema_name
-  and pg_class.relname = :table_name
-`;
-
 const extractTable = async (
   db: Knex,
   table: PgType<"table">,
@@ -371,22 +320,15 @@ const extractTable = async (
     index_map AS (
       ${indexMapQueryPart}
     ),
-    type_map AS (
-      ${typeMapQueryPart}
-    ),
     comment_map AS (
       ${commentMapQueryPart}
     )
     SELECT
       columns.column_name AS "name",
-      type_map.expanded_name AS "expandedType",
-      type_map.dimensions AS "dimensions",
-      type_map.type_info AS "type",
+      format_type(columns.udt_name::regtype, columns.character_maximum_length) AS "expandedType",
       comment_map.comment AS "comment",
-      character_maximum_length AS "maxLength", 
       column_default AS "defaultValue", 
       is_nullable = 'YES' AS "isNullable", 
-      data_type = 'ARRAY' AS "isArray", 
       is_identity = 'YES' AS "isIdentity", 
       is_updatable = 'YES' AS "isUpdatable", 
       ordinal_position AS "ordinalPosition", 
@@ -394,17 +336,14 @@ const extractTable = async (
         identity_generation
       ELSE
         is_generated
-      END AS "generated", 
+      END AS "generated",
       COALESCE(index_map.is_primary, FALSE) AS "isPrimaryKey", 
-      COALESCE(index_map.indices, '[]'::json) AS "indices", 
       COALESCE(reference_map.references, '[]'::json) AS "references", 
-      
       row_to_json(columns.*) AS "informationSchemaValue"
     FROM
       information_schema.columns
       LEFT JOIN index_map ON index_map.column_name = columns.column_name
       LEFT JOIN reference_map ON reference_map.column_name = columns.column_name
-      LEFT JOIN type_map ON type_map.column_name = columns.column_name
       LEFT JOIN comment_map ON comment_map.column_name = columns.column_name
     WHERE
       table_name = :table_name
@@ -413,10 +352,26 @@ const extractTable = async (
     { table_name: table.name, schema_name: table.schemaName },
   );
 
-  const columns = columnsQuery.rows.map((row: any) => ({
-    ...row,
-    // Add this deprecated field for backwards compatibility
-    reference: row.references[0] ?? null,
+  // Get the expanded type names from the query result
+  const expandedTypes = columnsQuery.rows.map((row: any) => row.expandedType);
+
+  // Use canonicaliseTypes to get detailed type information
+  const canonicalTypes = await canonicaliseTypes(db, expandedTypes);
+
+  // Combine the column information with the canonical type information
+  const columns = columnsQuery.rows.map((row: any, index: number) => ({
+    name: row.name,
+    type: canonicalTypes[index],
+    comment: row.comment,
+    defaultValue: row.defaultValue,
+    isPrimaryKey: row.isPrimaryKey,
+    references: row.references,
+    ordinalPosition: row.ordinalPosition,
+    isNullable: row.isNullable,
+    isIdentity: row.isIdentity,
+    isUpdatable: row.isUpdatable,
+    generated: row.generated,
+    informationSchemaValue: row.informationSchemaValue,
   }));
 
   const indicesQuery = await db.raw(
