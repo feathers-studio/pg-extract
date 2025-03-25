@@ -28,6 +28,7 @@ import fetchTypes from "./kinds/fetchTypes";
 import type { Kind } from "./kinds/PgType";
 import type PgType from "./kinds/PgType";
 import resolveViewColumns from "./resolveViewColumns";
+import { canonicaliseTypes } from "./kinds/query-parts/canonicaliseTypes";
 
 interface DetailsMap {
   domain: DomainDetails;
@@ -134,86 +135,96 @@ export interface ExtractSchemaOptions {
   onProgressEnd?: () => void;
 }
 
-/**
- * Perform the extraction
- * @param connectionConfig - Connection string or configuration object for Postgres connection
- * @param options - Optional options
- * @returns A record of all the schemas extracted, indexed by schema name.
- */
-async function extractSchemas(
-  connectionConfig: string | ConnectionConfig,
-  options?: ExtractSchemaOptions,
-): Promise<Record<string, Schema>> {
-  const connection = connectionConfig as string | Knex.PgConnectionConfig;
-  let db;
-  if (typeof connection === "string" && connection.startsWith("file:")) {
-    db = knex({
-      client: ClientPgLite,
-      dialect: "postgres",
-      connection: { filename: connection.slice("file:".length) },
-    });
-  } else {
-    db = knex({ client: "postgres", connection });
+export class Extractor {
+  private db: Knex;
+
+  /**
+   * @param connectionConfig - Connection string or configuration object for Postgres connection
+   */
+  constructor(connectionConfig: string | ConnectionConfig) {
+    const connection = connectionConfig;
+    if (typeof connection === "string" && connection.startsWith("file:"))
+      this.db = knex({
+        client: ClientPgLite,
+        dialect: "postgres",
+        connection: { filename: connection.slice("file:".length) },
+      });
+    else this.db = knex({ client: "postgres", connection });
   }
 
-  const q = await db
-    .select<{ nspname: string }[]>("nspname")
-    .from("pg_catalog.pg_namespace")
-    .whereNot("nspname", "=", "information_schema")
-    .whereNot("nspname", "LIKE", "pg_%");
-  const allSchemaNames = R.pluck("nspname", q);
+  async canonicaliseTypes(types: string[]) {
+    return canonicaliseTypes(this.db, types);
+  }
 
-  const schemaNames = options?.schemas ?? allSchemaNames;
-  if (options?.schemas) {
-    const missingSchemas = schemaNames.filter(
-      (schemaName) => !allSchemaNames.includes(schemaName),
-    );
+  /**
+   * Perform the extraction
+   * @param options - Optional options
+   * @returns A record of all the schemas extracted, indexed by schema name.
+   */
+  async extractSchemas(
+    options?: ExtractSchemaOptions,
+  ): Promise<Record<string, Schema>> {
+    const db = this.db;
 
-    if (missingSchemas.length > 0) {
-      throw new Error(`No schemas found for ${missingSchemas.join(", ")}`);
+    const q = await db
+      .select<{ nspname: string }[]>("nspname")
+      .from("pg_catalog.pg_namespace")
+      .whereNot("nspname", "=", "information_schema")
+      .whereNot("nspname", "LIKE", "pg_%");
+    const allSchemaNames = R.pluck("nspname", q);
+
+    const schemaNames = options?.schemas ?? allSchemaNames;
+    if (options?.schemas) {
+      const missingSchemas = schemaNames.filter(
+        (schemaName) => !allSchemaNames.includes(schemaName),
+      );
+
+      if (missingSchemas.length > 0) {
+        throw new Error(`No schemas found for ${missingSchemas.join(", ")}`);
+      }
     }
-  }
 
-  const pgTypes = await fetchTypes(db, schemaNames);
+    const pgTypes = await fetchTypes(db, schemaNames);
 
-  const typesToExtract = options?.typeFilter
-    ? pgTypes.filter((element) => options.typeFilter!(element))
-    : pgTypes;
+    const typesToExtract = options?.typeFilter
+      ? pgTypes.filter((element) => options.typeFilter!(element))
+      : pgTypes;
 
-  options?.onProgressStart?.(typesToExtract.length);
+    options?.onProgressStart?.(typesToExtract.length);
 
-  const populated = (
-    await Promise.all(
-      typesToExtract.map(async (pgType) => {
-        const result = await (
-          populatorMap[pgType.kind] as Populator<typeof pgType.kind>
-        )(db, pgType);
-        options?.onProgress?.();
-        return result;
-      }),
-    )
-  ).flat();
+    const populated = (
+      await Promise.all(
+        typesToExtract.map(async (pgType) => {
+          const result = await (
+            populatorMap[pgType.kind] as Populator<typeof pgType.kind>
+          )(db, pgType);
+          options?.onProgress?.();
+          return result;
+        }),
+      )
+    ).flat();
 
-  const schemas: Record<string, Schema> = {};
-  for (const p of populated) {
-    if (!(p.schemaName in schemas)) {
-      schemas[p.schemaName] = {
-        name: p.schemaName,
-        ...emptySchema,
-      };
+    const schemas: Record<string, Schema> = {};
+    for (const p of populated) {
+      if (!(p.schemaName in schemas)) {
+        schemas[p.schemaName] = {
+          name: p.schemaName,
+          ...emptySchema,
+        };
+      }
+      (schemas[p.schemaName][`${p.kind}s`] as DetailsMap[typeof p.kind][]) = [
+        ...schemas[p.schemaName][`${p.kind}s`],
+        p,
+      ];
     }
-    (schemas[p.schemaName][`${p.kind}s`] as DetailsMap[typeof p.kind][]) = [
-      ...schemas[p.schemaName][`${p.kind}s`],
-      p,
-    ];
+
+    const result = options?.resolveViews
+      ? resolveViewColumns(schemas)
+      : schemas;
+
+    options?.onProgressEnd?.();
+
+    await db.destroy();
+    return result;
   }
-
-  const result = options?.resolveViews ? resolveViewColumns(schemas) : schemas;
-
-  options?.onProgressEnd?.();
-
-  await db.destroy();
-  return result;
 }
-
-export default extractSchemas;

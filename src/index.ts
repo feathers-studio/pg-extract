@@ -1,6 +1,5 @@
-export { default as extractSchema } from "./deprecatia/extract-schema";
 export type { ExtractSchemaOptions, Schema } from "./extractSchemas";
-export { default as extractSchemas } from "./extractSchemas";
+export { Extractor } from "./extractSchemas";
 export type { default as InformationSchemaColumn } from "./information_schema/InformationSchemaColumn";
 export type { default as InformationSchemaDomain } from "./information_schema/InformationSchemaDomain";
 export type { default as InformationSchemaRoutine } from "./information_schema/InformationSchemaRoutine";
@@ -52,4 +51,3 @@ export type {
   ViewDetails,
 } from "./kinds/extractView";
 export type { Kind, default as PgType } from "./kinds/PgType";
-export { canonicaliseTypes } from "./kinds/query-parts/canonicaliseType";
