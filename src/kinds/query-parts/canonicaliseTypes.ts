@@ -11,37 +11,36 @@ export namespace CanonicalType {
     Unknown = "unknown",
   }
 
-  export interface Abstract {
+  interface Abstract {
     original_type: string;
     canonical_name: string;
     schema: string;
     name: string;
-    type_kind: TypeKind;
+    kind: TypeKind;
     dimensions: number;
     modifiers: string;
   }
 
   export interface Base extends Abstract {
-    type_kind: TypeKind.Base;
+    kind: TypeKind.Base;
   }
 
   export interface Enum extends Abstract {
-    type_kind: TypeKind.Enum;
+    kind: TypeKind.Enum;
     enum_values: string[];
   }
 
   export interface Composite extends Abstract {
-    type_kind: TypeKind.Composite;
+    kind: TypeKind.Composite;
     attributes: {
       name: string;
-      number: number;
-      type_oid: number;
-      type_name: string;
+      index: number;
+      type: CanonicalType;
     }[];
   }
 
   export interface Domain extends Abstract {
-    type_kind: TypeKind.Domain;
+    kind: TypeKind.Domain;
     domain_base_type: {
       canonical_name: string;
       schema: string;
@@ -50,12 +49,12 @@ export namespace CanonicalType {
   }
 
   export interface Range extends Abstract {
-    type_kind: TypeKind.Range;
+    kind: TypeKind.Range;
     range_subtype: string | null;
   }
 
   export interface Pseudo extends Abstract {
-    type_kind: TypeKind.Pseudo;
+    kind: TypeKind.Pseudo;
   }
 }
 export type CanonicalType =
@@ -150,7 +149,7 @@ export const canonicaliseTypes = async (
               jsonb_agg(
                   jsonb_build_object(
                       'name', a.attname,
-                      'number', a.attnum,
+                      'index', a.attnum,
                       'type_oid', a.atttypid,
                       'type_name', format_type(a.atttypid, null)
                   )
@@ -219,7 +218,7 @@ export const canonicaliseTypes = async (
           'canonical_name', b.schema_name || '.' || b.internal_name,
           'schema', b.schema_name,
           'name', b.internal_name,
-          'type_kind', b.type_kind,
+          'kind', b.type_kind,
           'dimensions', b.dimensions,
           'original_type', b.type_name,
           'modifiers', b.modifiers,
@@ -249,9 +248,47 @@ export const canonicaliseTypes = async (
     `;
 
   interface Resolved {
-    type_info: CanonicalType;
+    type_info:
+      | Exclude<CanonicalType, CanonicalType.Composite>
+      | (Omit<CanonicalType.Composite, "attributes"> & {
+          kind: CanonicalType.TypeKind;
+          attributes: {
+            name: string;
+            index: number;
+            type_oid: number;
+            type_name: string;
+          }[];
+        });
   }
 
   const resolved = (await db.raw(query, types)).rows as Resolved[];
-  return resolved.map((each) => each.type_info);
+  return Promise.all(
+    resolved
+      .map((each) => each.type_info)
+      .map(async (each) => {
+        if (each.kind === CanonicalType.TypeKind.Composite) {
+          const types = each.attributes.map((each) => each.type_name);
+          const canonical = await canonicaliseTypes(db, types);
+
+          const attributes: CanonicalType.Composite["attributes"] =
+            await Promise.all(
+              each.attributes.map(async (each, index) => {
+                return {
+                  name: each.name,
+                  index: each.index,
+                  type: canonical[index],
+                };
+              }),
+            );
+
+          return {
+            ...each,
+            kind: CanonicalType.TypeKind.Composite,
+            attributes,
+          } satisfies CanonicalType.Composite;
+        }
+
+        return each satisfies CanonicalType;
+      }),
+  );
 };
