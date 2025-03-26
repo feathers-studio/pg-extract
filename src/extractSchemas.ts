@@ -28,7 +28,10 @@ import fetchTypes from "./kinds/fetchTypes";
 import type { Kind } from "./kinds/PgType";
 import type PgType from "./kinds/PgType";
 import resolveViewColumns from "./resolveViewColumns";
-import { canonicaliseTypes } from "./kinds/query-parts/canonicaliseTypes";
+import {
+  canonicaliseTypes,
+  CanonicalType,
+} from "./kinds/query-parts/canonicaliseTypes";
 
 interface DetailsMap {
   domain: DomainDetails;
@@ -169,6 +172,40 @@ export class Extractor {
 
   async canonicaliseTypes(types: string[]) {
     return canonicaliseTypes(this.db, types);
+  }
+
+  async getBuiltinTypes(): Promise<
+    {
+      name: string;
+      format: string;
+      kind: string;
+    }[]
+  > {
+    const query = `
+      SELECT t.typname AS name,
+            pg_catalog.format_type(t.oid, NULL) AS format,
+            CASE t.typtype
+                WHEN 'b' THEN 'base'
+                WHEN 'c' THEN 'composite'
+                WHEN 'd' THEN 'domain'
+                WHEN 'e' THEN 'enum'
+                WHEN 'p' THEN 'pseudo'
+                WHEN 'r' THEN 'range'
+                ELSE 'unknown'
+            END AS kind
+      FROM pg_catalog.pg_type t
+      WHERE t.typnamespace = 
+            (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')
+      ORDER BY name;
+    `;
+
+    const result = await this.db.raw(query);
+
+    return result.rows as {
+      name: string;
+      format: string;
+      kind: CanonicalType.TypeKind;
+    }[];
   }
 
   /**
