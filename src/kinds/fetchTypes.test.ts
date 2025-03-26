@@ -51,7 +51,7 @@ describe("fetchTypes", () => {
       ["some_table", "table"],
       ["some_procedure", "procedure"],
       ["some_domain", "domain"],
-      ["some_composite_type", "compositeType"],
+      ["some_composite_type", "composite"],
       ["some_range", "range"],
       ["some_view", "view"],
       ["some_enum", "enum"],

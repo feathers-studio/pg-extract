@@ -65,7 +65,7 @@ export interface CompositeTypeAttribute {
 /**
  * Composite type in a schema with details.
  */
-export interface CompositeTypeDetails extends PgType<"compositeType"> {
+export interface CompositeTypeDetails extends PgType<"composite"> {
   /**
    * Canonical representation of the composite type
    * with full attribute details.
@@ -75,10 +75,10 @@ export interface CompositeTypeDetails extends PgType<"compositeType"> {
 
 const extractCompositeType = async (
   db: Knex,
-  compositeType: PgType<"compositeType">,
+  composite: PgType<"composite">,
 ): Promise<CompositeTypeDetails> => {
   // Form the fully qualified type name
-  const fullTypeName = `${compositeType.schemaName}.${compositeType.name}`;
+  const fullTypeName = `${composite.schemaName}.${composite.name}`;
 
   // Get canonical type information with all the metadata
   const canonicalTypes = await canonicaliseTypes(db, [fullTypeName]);
@@ -88,7 +88,7 @@ const extractCompositeType = async (
 
   // Return the composite type with its canonical representation
   return {
-    ...compositeType,
+    ...composite,
     canonical: canonicalType,
   };
 };

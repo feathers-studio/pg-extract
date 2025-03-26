@@ -13,10 +13,10 @@ import type PgType from "./PgType";
 const makePgType = (
   name: string,
   schemaName = "test",
-): PgType<"compositeType"> => ({
+): PgType<"composite"> => ({
   schemaName,
   name,
-  kind: "compositeType",
+  kind: "composite",
   comment: null,
 });
 
@@ -36,7 +36,7 @@ describe("extractCompositeType", () => {
     const expected: CompositeTypeDetails = {
       name: "some_composite_type",
       schemaName: "test",
-      kind: "compositeType",
+      kind: "composite",
       comment: null,
       attributes: [
         {

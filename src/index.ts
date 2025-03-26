@@ -1,4 +1,8 @@
-export type { ExtractSchemaOptions, Schema } from "./extractSchemas";
+export type {
+  ExtractSchemaOptions,
+  Schema,
+  SchemaType,
+} from "./extractSchemas";
 export { Extractor } from "./extractSchemas";
 export type { CanonicalType } from "./kinds/query-parts/canonicaliseTypes";
 export type { default as InformationSchemaColumn } from "./information_schema/InformationSchemaColumn";
@@ -8,7 +12,6 @@ export type { default as InformationSchemaTable } from "./information_schema/Inf
 export type { default as InformationSchemaView } from "./information_schema/InformationSchemaView";
 export type { default as YesNo } from "./information_schema/YesNo";
 export type {
-  AttributeType,
   CompositeTypeAttribute,
   CompositeTypeDetails,
 } from "./kinds/extractCompositeType";
@@ -38,7 +41,6 @@ export type {
   Index,
   TableCheck,
   TableColumn,
-  TableColumnType,
   TableDetails,
   TableIndex,
   TableIndexColumn,

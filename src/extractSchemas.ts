@@ -38,7 +38,7 @@ interface DetailsMap {
   foreignTable: ForeignTableDetails;
   materializedView: MaterializedViewDetails;
   view: ViewDetails;
-  compositeType: CompositeTypeDetails;
+  composite: CompositeTypeDetails;
   function: FunctionDetails;
   procedure: ProcedureDetails;
 }
@@ -56,10 +56,22 @@ export type Schema = {
   foreignTables: ForeignTableDetails[];
   views: ViewDetails[];
   materializedViews: MaterializedViewDetails[];
-  compositeTypes: CompositeTypeDetails[];
+  composites: CompositeTypeDetails[];
   functions: FunctionDetails[];
   procedures: ProcedureDetails[];
 };
+
+export type SchemaType =
+  | DomainDetails
+  | EnumDetails
+  | RangeDetails
+  | TableDetails
+  | ForeignTableDetails
+  | ViewDetails
+  | MaterializedViewDetails
+  | CompositeTypeDetails
+  | FunctionDetails
+  | ProcedureDetails;
 
 const emptySchema: Omit<Schema, "name"> = {
   domains: [],
@@ -69,7 +81,7 @@ const emptySchema: Omit<Schema, "name"> = {
   foreignTables: [],
   views: [],
   materializedViews: [],
-  compositeTypes: [],
+  composites: [],
   functions: [],
   procedures: [],
 };
@@ -87,7 +99,7 @@ const populatorMap: { [K in Kind]: Populator<K> } = {
   foreignTable: extractForeignTable,
   view: extractView,
   materializedView: extractMaterializedView,
-  compositeType: extractCompositeType,
+  composite: extractCompositeType,
   function: extractFunction,
   procedure: extractProcedure,
 };
@@ -147,7 +159,10 @@ export class Extractor {
       this.db = knex({
         client: ClientPgLite,
         dialect: "postgres",
-        connection: { filename: connection.slice("file:".length) },
+        connection: {
+          filename: connection.slice("file:".length),
+          connectTimeout: Infinity,
+        },
       });
     else this.db = knex({ client: "postgres", connection });
   }
