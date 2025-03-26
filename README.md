@@ -1,37 +1,41 @@
 # Extract Schema from Postgres Database
 
 Reads various metadata from your postgres database and return a Javascript object.
-This package is used by [Kanel](https://github.com/kristiandupont/kanel) to generate Typescript types and [Schemalint](https://github.com/kristiandupont/schemalint) to provide linting of database schemas.
-
-View the documentation [here](https://kristiandupont.github.io/extract-pg-schema)
+This package was originally forked from [extract-pg-schema](https://github.com/kristiandupont/extract-pg-schema) by [Kristian Dupont](https://github.com/kristiandupont) to extend its utility and to generate perfect types. It's now a standalone package.
 
 ## Installation
 
+Choose your package manager:
+
 ```bash
-npm i extract-pg-schema
+bun add pg-extract
+```
+
+```bash
+npm i pg-extract
+```
+
+```bash
+pnpm add pg-extract
 ```
 
 ## Library Usage
 
-You give it a [postgres connection config object](https://node-postgres.com/apis/client) and some options and it will connect to your database and generate
+You give it a [postgres connection config object](https://node-postgres.com/apis/client) and some options and it will connect to your database and generate an object with the schema.
 
 ```javascript
-const { extractSchemas } = require('extract-pg-schema');
+import { Extractor } from "pg-extract";
 
-async function run() {
-  const connection = {
-    host: 'localhost',
-    database: 'postgres',
-    user: 'postgres',
-    password: 'postgres',
-  };
+const extractor = new Extractor({
+  host: "localhost",
+  database: "postgres",
+  user: "postgres",
+  password: "postgres",
+});
 
-  const result = await extractSchemas(connection);
+const result = await extractor.extractSchemas();
 
-  console.log(result);
-}
-
-run();
+console.log(result);
 ```
 
 For an example of a generated object, take a look at [dvdrental.json](./dvdrental.json) file which is generated from the [sample Database](https://www.postgresqltutorial.com/postgresql-sample-database/) from [PostgreSQLTutorial.com](https://www.postgresqltutorial.com).
@@ -41,13 +45,12 @@ For an example of a generated object, take a look at [dvdrental.json](./dvdrenta
 You can also use the CLI to extract the schemas from a database and write it to the console or a file in JSON format.
 
 ```bash
-npx extract-pg-schema -h localhost -p 5432 -U postgres -d postgres > schemas.json
+# Or bunx / pnpm dlx
+npx pg-extract -h localhost -p 5432 -U postgres -d postgres > schemas.json
 ```
 
-The CLI takes a small subset of the options that [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html) takes. You can also use the [environment variables](https://node-postgres.com/features/connecting#environment-variables) starting with `PG` to set the connection parameters.
-
 ```
-Usage: extract-pg-schema [options] [DBNAME]
+Usage: pg-extract [options] [DBNAME]
 
 Extract all schemas from a PostgreSQL database and print them as JSON.
 
@@ -65,8 +68,4 @@ Options:
 
 ## Contributors
 
-<a href="https://github.com/kristiandupont/extract-pg-schema/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=kristiandupont/extract-pg-schema" />
-</a>
-
-Made with [contrib.rocks](https://contrib.rocks).
+We're grateful to [Kristian Dupont](https://github.com/kristiandupont) and the other contributors to the [extract-pg-schema](https://github.com/kristiandupont/extract-pg-schema) project for the package we are building on top of.

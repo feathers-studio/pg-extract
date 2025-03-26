@@ -1,6 +1,6 @@
 {
   "name": "pg-extract",
-  "version": "5.3.5",
+  "version": "0.0.1",
   "keywords": [
     "postgresql",
     "schema"
@@ -13,7 +13,7 @@
   },
   "main": "src/index.ts",
   "bin": {
-    "extract-pg-schema": "bin/extract-pg-schema"
+    "pg-extract": "bin/pg-extract"
   },
   "files": [
     "build/"
