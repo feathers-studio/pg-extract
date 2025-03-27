@@ -1,8 +1,8 @@
 import type { Knex } from "knex";
 
-import fetchExtensionItemIds from "../fetchExtensionItemIds";
-import type PgType from "./PgType";
-import { classKindMap, typeKindMap } from "./PgType";
+import fetchExtensionItemIds from "../fetchExtensionItemIds.ts";
+import type PgType from "./PgType.ts";
+import { classKindMap, typeKindMap } from "./PgType.ts";
 
 const fetchTypes = async (
   db: Knex,

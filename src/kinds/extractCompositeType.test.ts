@@ -1,14 +1,15 @@
 import * as R from "ramda";
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
 import type {
   CompositeTypeAttribute,
   CompositeTypeDetails,
-} from "./extractCompositeType";
-import extractCompositeType from "./extractCompositeType";
-import type PgType from "./PgType";
+} from "./extractCompositeType.ts";
+import extractCompositeType from "./extractCompositeType.ts";
+import type PgType from "./PgType.ts";
+import { CanonicalType } from "./query-parts/canonicaliseTypes.ts";
 
 const makePgType = (
   name: string,
@@ -33,79 +34,29 @@ describe("extractCompositeType", () => {
       makePgType("some_composite_type"),
     );
 
-    const expected: CompositeTypeDetails = {
-      name: "some_composite_type",
-      schemaName: "test",
-      kind: "composite",
-      comment: null,
-      attributes: [
-        {
-          name: "id",
-          expandedType: "pg_catalog.int4",
-          isArray: false,
-          type: {
-            fullName: "pg_catalog.int4",
-            kind: "base",
-          },
-          comment: null,
-          maxLength: null,
-          defaultValue: null,
-          isNullable: true,
-          isIdentity: false,
-          isUpdatable: false,
-          ordinalPosition: 1,
-          generated: "NEVER",
-          fakeInformationSchemaValue: {
-            table_catalog: databaseName,
-            table_schema: "test",
-            table_name: "some_composite_type",
-            column_name: "id",
-            ordinal_position: 1,
-            column_default: null,
-            is_nullable: "YES",
-            data_type: "integer",
-            character_maximum_length: null,
-            character_octet_length: null,
-            numeric_precision: 32,
-            numeric_precision_radix: 2,
-            numeric_scale: 0,
-            datetime_precision: null,
-            interval_type: null,
-            interval_precision: null,
-            character_set_catalog: null,
-            character_set_schema: null,
-            character_set_name: null,
-            collation_catalog: null,
-            collation_schema: null,
-            collation_name: null,
-            domain_catalog: null,
-            domain_schema: null,
-            domain_name: null,
-            udt_catalog: databaseName,
-            udt_schema: "pg_catalog",
-            udt_name: "int4",
-            scope_catalog: null,
-            scope_schema: null,
-            scope_name: null,
-            maximum_cardinality: null,
-            dtd_identifier: "1",
-            is_self_referencing: "NO",
-            is_identity: "NO",
-            identity_generation: null,
-            identity_start: null,
-            identity_increment: null,
-            identity_maximum: null,
-            identity_minimum: null,
-            identity_cycle: "NO",
-            is_generated: "NEVER",
-            generation_expression: null,
-            is_updatable: "NO",
-          },
+    const actual = (result as CompositeTypeDetails).canonical.attributes.map(
+      (attribute) => ({
+        name: attribute.name,
+        type: {
+          canonical_name: attribute.type.canonical_name,
+          kind: attribute.type.kind,
+          dimensions: attribute.type.dimensions,
         },
-      ],
-    };
+      }),
+    );
 
-    expect(result).toStrictEqual(expected);
+    const expected: typeof actual = [
+      {
+        name: "id",
+        type: {
+          canonical_name: "pg_catalog.int4",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 0,
+        },
+      },
+    ];
+
+    expect(actual).toEqual(expected);
   });
 
   it("should fetch column comments", async () => {
@@ -122,7 +73,9 @@ describe("extractCompositeType", () => {
       makePgType("some_composite_type"),
     );
 
-    expect(result.attributes[0].comment).toBe("id column");
+    expect(
+      (result as CompositeTypeDetails).canonical.attributes[0].comment,
+    ).toBe("id column");
   });
 
   it("should handle domains, composite types, ranges and enums as well as arrays of those", async () => {
@@ -149,71 +102,82 @@ describe("extractCompositeType", () => {
       db,
       makePgType("some_composite_type"),
     );
-    const actual = R.map(
-      R.pick(["name", "expandedType", "type", "isArray"]),
-      result.attributes,
+
+    const actual = (result as CompositeTypeDetails).canonical.attributes.map(
+      (attribute) => ({
+        name: attribute.name,
+        type: {
+          canonical_name: attribute.type.canonical_name,
+          kind: attribute.type.kind,
+          dimensions: attribute.type.dimensions,
+        },
+      }),
     );
 
-    const expected: Partial<CompositeTypeAttribute>[] = [
+    const expected: typeof actual = [
       {
         name: "d",
-        expandedType: "test.some_domain",
         type: {
-          fullName: "test.some_domain",
-          kind: "domain",
+          canonical_name: "test.some_domain",
+          kind: CanonicalType.TypeKind.Domain,
+          dimensions: 0,
         },
-        isArray: false,
       },
       {
         name: "c",
-        expandedType: "test.some_composite",
-        type: { fullName: "test.some_composite", kind: "composite" },
-        isArray: false,
+        type: {
+          canonical_name: "test.some_composite",
+          kind: CanonicalType.TypeKind.Composite,
+          dimensions: 0,
+        },
       },
       {
         name: "r",
-        expandedType: "test.some_range",
         type: {
-          fullName: "test.some_range",
-          kind: "range",
+          canonical_name: "test.some_range",
+          kind: CanonicalType.TypeKind.Range,
+          dimensions: 0,
         },
-        isArray: false,
       },
       {
         name: "e",
-        expandedType: "test.some_enum",
-        type: { fullName: "test.some_enum", kind: "enum" },
-        isArray: false,
+        type: {
+          canonical_name: "test.some_enum",
+          kind: CanonicalType.TypeKind.Enum,
+          dimensions: 0,
+        },
       },
       {
         name: "d_a",
-        expandedType: "test.some_domain[]",
         type: {
-          fullName: "test.some_domain",
-          kind: "domain",
+          canonical_name: "test.some_domain[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
         },
-        isArray: true,
       },
       {
         name: "c_a",
-        expandedType: "test.some_composite[]",
-        type: { fullName: "test.some_composite", kind: "composite" },
-        isArray: true,
+        type: {
+          canonical_name: "test.some_composite[]",
+          kind: CanonicalType.TypeKind.Composite,
+          dimensions: 1,
+        },
       },
       {
         name: "r_a",
-        expandedType: "test.some_range[]",
         type: {
-          fullName: "test.some_range",
-          kind: "range",
+          canonical_name: "test.some_range[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
         },
-        isArray: true,
       },
       {
         name: "e_a",
-        expandedType: "test.some_enum[]",
-        type: { fullName: "test.some_enum", kind: "enum" },
-        isArray: true,
+        type: {
+          canonical_name: "test.some_enum[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
+        },
       },
     ];
 

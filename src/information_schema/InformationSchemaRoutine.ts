@@ -1,4 +1,4 @@
-import type YesNo from "./YesNo";
+import type YesNo from "./YesNo.ts";
 
 /**
  * Information about all routines in the current database

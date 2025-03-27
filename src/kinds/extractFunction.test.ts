@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine";
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
-import type { FunctionDetails } from "./extractFunction";
-import extractFunction from "./extractFunction";
-import type PgType from "./PgType";
+import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine.ts";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
+import type { FunctionDetails } from "./extractFunction.ts";
+import extractFunction, { FunctionReturnTypeKind } from "./extractFunction.ts";
+import type PgType from "./PgType.ts";
+import { CanonicalType } from "./query-parts/canonicaliseTypes.ts";
 
 const makePgType = (name: string, schemaName = "test"): PgType<"function"> => ({
   schemaName,
@@ -32,13 +33,23 @@ describe("extractFunction", () => {
       kind: "function",
       comment: null,
       parameters: [],
-      returnType: "text",
+      returnType: {
+        kind: FunctionReturnTypeKind.Regular,
+        isSet: false,
+        type: {
+          schema: "pg_catalog",
+          name: "text",
+          original_type: "pg_catalog.text",
+          canonical_name: "pg_catalog.text",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 0,
+        },
+      },
       language: "plpgsql",
       definition: " BEGIN return 'hello'; END; ",
       isStrict: false,
       isSecurityDefiner: false,
       isLeakProof: false,
-      returnsSet: false,
       volatility: "VOLATILE",
       parallelSafety: "UNSAFE",
       estimatedCost: 100,
@@ -143,13 +154,31 @@ describe("extractFunction", () => {
       parameters: [
         {
           name: "$1",
-          type: "text",
+          type: {
+            schema: "pg_catalog",
+            name: "text",
+            original_type: "pg_catalog.text",
+            canonical_name: "pg_catalog.text",
+            kind: CanonicalType.TypeKind.Base,
+            dimensions: 0,
+          },
           mode: "IN",
           hasDefault: false,
           ordinalPosition: 1,
         },
       ],
-      returnType: "text",
+      returnType: {
+        kind: FunctionReturnTypeKind.Regular,
+        isSet: false,
+        type: {
+          canonical_name: "pg_catalog.text",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 0,
+          original_type: "pg_catalog.text",
+          schema: "pg_catalog",
+          name: "text",
+        },
+      },
       language: "plpgsql",
       definition: " BEGIN return $1; END; ",
     };

@@ -1,8 +1,8 @@
 import type { Knex } from "knex";
 
-import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine";
-import { parsePostgresArray } from "./parsePostgresArray";
-import type PgType from "./PgType";
+import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine.ts";
+import { parsePostgresArray } from "./parsePostgresArray.ts";
+import type PgType from "./PgType.ts";
 
 // Reuse these from extractFunction.ts
 const parameterModeMap = {

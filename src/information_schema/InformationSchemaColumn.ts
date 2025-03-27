@@ -1,4 +1,4 @@
-import type YesNo from "./YesNo";
+import type YesNo from "./YesNo.ts";
 
 /**
  * The view columns contains information about all table columns (or view columns) in the database. System columns (ctid, etc.) are not included. Only those columns are shown that the current user has access to (by way of being the owner or having some privilege).

@@ -4,34 +4,34 @@ import ClientPgLite from "knex-pglite";
 import type { ConnectionConfig } from "pg";
 import * as R from "ramda";
 
-import type { CompositeTypeDetails } from "./kinds/extractCompositeType";
-import extractCompositeType from "./kinds/extractCompositeType";
-import type { DomainDetails } from "./kinds/extractDomain";
-import extractDomain from "./kinds/extractDomain";
-import type { EnumDetails } from "./kinds/extractEnum";
-import extractEnum from "./kinds/extractEnum";
-import type { ForeignTableDetails } from "./kinds/extractForeignTable";
-import extractForeignTable from "./kinds/extractForeignTable";
-import type { FunctionDetails } from "./kinds/extractFunction";
-import extractFunction from "./kinds/extractFunction";
-import type { MaterializedViewDetails } from "./kinds/extractMaterializedView";
-import extractMaterializedView from "./kinds/extractMaterializedView";
-import type { ProcedureDetails } from "./kinds/extractProcedure";
-import extractProcedure from "./kinds/extractProcedure";
-import type { RangeDetails } from "./kinds/extractRange";
-import extractRange from "./kinds/extractRange";
-import type { TableDetails } from "./kinds/extractTable";
-import extractTable from "./kinds/extractTable";
-import type { ViewDetails } from "./kinds/extractView";
-import extractView from "./kinds/extractView";
-import fetchTypes from "./kinds/fetchTypes";
-import type { Kind } from "./kinds/PgType";
-import type PgType from "./kinds/PgType";
-import resolveViewColumns from "./resolveViewColumns";
+import type { CompositeTypeDetails } from "./kinds/extractCompositeType.ts";
+import extractCompositeType from "./kinds/extractCompositeType.ts";
+import type { DomainDetails } from "./kinds/extractDomain.ts";
+import extractDomain from "./kinds/extractDomain.ts";
+import type { EnumDetails } from "./kinds/extractEnum.ts";
+import extractEnum from "./kinds/extractEnum.ts";
+import type { ForeignTableDetails } from "./kinds/extractForeignTable.ts";
+import extractForeignTable from "./kinds/extractForeignTable.ts";
+import type { FunctionDetails } from "./kinds/extractFunction.ts";
+import extractFunction from "./kinds/extractFunction.ts";
+import type { MaterializedViewDetails } from "./kinds/extractMaterializedView.ts";
+import extractMaterializedView from "./kinds/extractMaterializedView.ts";
+import type { ProcedureDetails } from "./kinds/extractProcedure.ts";
+import extractProcedure from "./kinds/extractProcedure.ts";
+import type { RangeDetails } from "./kinds/extractRange.ts";
+import extractRange from "./kinds/extractRange.ts";
+import type { TableDetails } from "./kinds/extractTable.ts";
+import extractTable from "./kinds/extractTable.ts";
+import type { ViewDetails } from "./kinds/extractView.ts";
+import extractView from "./kinds/extractView.ts";
+import fetchTypes from "./kinds/fetchTypes.ts";
+import type { Kind } from "./kinds/PgType.ts";
+import type PgType from "./kinds/PgType.ts";
+import resolveViewColumns from "./resolveViewColumns.ts";
 import {
   canonicaliseTypes,
   CanonicalType,
-} from "./kinds/query-parts/canonicaliseTypes";
+} from "./kinds/query-parts/canonicaliseTypes.ts";
 
 interface DetailsMap {
   domain: DomainDetails;

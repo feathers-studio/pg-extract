@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import parseViewDefinition from "./parseViewDefinition";
+import parseViewDefinition from "./parseViewDefinition.ts";
 
 describe("parseViewDefinition", () => {
   it("should understand a trivial select", async () => {

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
-import extractForeignTable from "./extractForeignTable";
-import type PgType from "./PgType";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
+import extractForeignTable from "./extractForeignTable.ts";
+import type PgType from "./PgType.ts";
 
 const makePgType = (
   name: string,

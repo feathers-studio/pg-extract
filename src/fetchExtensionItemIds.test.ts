@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import fetchExtensionItemIds from "./fetchExtensionItemIds";
-import useSchema from "./tests/useSchema";
-import useTestKnex from "./tests/useTestKnex";
+import fetchExtensionItemIds from "./fetchExtensionItemIds.ts";
+import useSchema from "./tests/useSchema.ts";
+import useTestKnex from "./tests/useTestKnex.ts";
 
 describe("fetchExtensionItemIds", () => {
   const [getKnex] = useTestKnex();
@@ -13,6 +13,7 @@ describe("fetchExtensionItemIds", () => {
   // not necessarily the test.
   it("should fetch extension item ids", async () => {
     const db = getKnex();
+    console.log("creating extensions");
 
     await db.raw("create extension if not exists pg_trgm");
     await db.raw("create extension if not exists pg_stat_statements");

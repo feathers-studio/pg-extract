@@ -1,13 +1,13 @@
 import type { Knex } from "knex";
 import * as R from "ramda";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn";
-import type InformationSchemaView from "../information_schema/InformationSchemaView";
-import type { ColumnReference, Index } from "./extractTable";
-import type { ViewReference } from "./parseViewDefinition";
-import parseViewDefinition from "./parseViewDefinition";
-import type PgType from "./PgType";
-import commentMapQueryPart from "./query-parts/commentMapQueryPart";
+import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
+import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
+import type { ColumnReference, Index } from "./extractTable.ts";
+import type { ViewReference } from "./parseViewDefinition.ts";
+import parseViewDefinition from "./parseViewDefinition.ts";
+import type PgType from "./PgType.ts";
+import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
 
 /**
  * Column type in a view.

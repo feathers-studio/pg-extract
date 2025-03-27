@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
-import type { EnumDetails } from "./extractEnum";
-import extractEnum from "./extractEnum";
-import type PgType from "./PgType";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
+import type { EnumDetails } from "./extractEnum.ts";
+import extractEnum from "./extractEnum.ts";
+import type PgType from "./PgType.ts";
 
 const makePgType = (name: string, schemaName = "test"): PgType<"enum"> => ({
   schemaName,

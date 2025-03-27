@@ -1,11 +1,11 @@
 import * as R from "ramda";
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
-import type { ViewColumn, ViewDetails } from "./extractView";
-import extractView from "./extractView";
-import type PgType from "./PgType";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
+import type { ViewColumn, ViewDetails } from "./extractView.ts";
+import extractView from "./extractView.ts";
+import type PgType from "./PgType.ts";
 
 const makePgType = (name: string, schemaName = "test"): PgType<"view"> => ({
   schemaName,

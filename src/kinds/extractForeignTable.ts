@@ -1,9 +1,9 @@
 import type { Knex } from "knex";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn";
-import type InformationSchemaView from "../information_schema/InformationSchemaView";
-import type PgType from "./PgType";
-import commentMapQueryPart from "./query-parts/commentMapQueryPart";
+import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
+import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
+import type PgType from "./PgType.ts";
+import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
 
 /**
  * Column type in a foreign table.

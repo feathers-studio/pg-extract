@@ -1,14 +1,14 @@
 import type { Knex } from "knex";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn";
-import type InformationSchemaTable from "../information_schema/InformationSchemaTable";
-import type PgType from "./PgType";
-import commentMapQueryPart from "./query-parts/commentMapQueryPart";
-import indexMapQueryPart from "./query-parts/indexMapQueryPart";
+import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
+import type InformationSchemaTable from "../information_schema/InformationSchemaTable.ts";
+import type PgType from "./PgType.ts";
+import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
+import indexMapQueryPart from "./query-parts/indexMapQueryPart.ts";
 import {
   CanonicalType,
   canonicaliseTypes,
-} from "./query-parts/canonicaliseTypes";
+} from "./query-parts/canonicaliseTypes.ts";
 
 export const updateActionMap = {
   a: "NO ACTION",

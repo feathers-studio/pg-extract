@@ -1,12 +1,12 @@
 import type { Knex } from "knex";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn";
-import type InformationSchemaView from "../information_schema/InformationSchemaView";
-import type { ColumnReference, Index } from "./extractTable";
-import type PgType from "./PgType";
-import commentMapQueryPart from "./query-parts/commentMapQueryPart";
-import fakeInformationSchemaColumnsQueryPart from "./query-parts/fakeInformationSchemaColumnsQueryPart";
-import fakeInformationSchemaViewsQueryPart from "./query-parts/fakeInformationSchemaViewsQueryPart";
+import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
+import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
+import type { ColumnReference, Index } from "./extractTable.ts";
+import type PgType from "./PgType.ts";
+import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
+import fakeInformationSchemaColumnsQueryPart from "./query-parts/fakeInformationSchemaColumnsQueryPart.ts";
+import fakeInformationSchemaViewsQueryPart from "./query-parts/fakeInformationSchemaViewsQueryPart.ts";
 
 /**
  * Column type in a materialized view.

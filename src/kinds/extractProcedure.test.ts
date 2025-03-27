@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine";
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
-import type { ProcedureDetails } from "./extractProcedure";
-import extractProcedure from "./extractProcedure";
-import type PgType from "./PgType";
+import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine.ts";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
+import type { ProcedureDetails } from "./extractProcedure.ts";
+import extractProcedure from "./extractProcedure.ts";
+import type PgType from "./PgType.ts";
 
 const makePgType = (
   name: string,

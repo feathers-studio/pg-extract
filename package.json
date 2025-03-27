@@ -5,6 +5,7 @@
     "postgresql",
     "schema"
   ],
+  "type": "module",
   "repository": "git@github.com:feathers-studio/pg-extract.git",
   "license": "MIT",
   "author": {
@@ -19,6 +20,7 @@
     "build/"
   ],
   "scripts": {
+    "check": "tsc --noEmit",
     "build": "tsc",
     "lint": "eslint . --report-unused-disable-directives",
     "test": "vitest run",
@@ -33,20 +35,20 @@
     "knex-pglite": "^0.11.0",
     "pg": "8.13.3",
     "pg-query-emscripten": "^5.1.0",
-    "ramda": "^0.30.0",
-    "tagged-comment-parser": "^1.3.3"
+    "ramda": "^0.30.1",
+    "tagged-comment-parser": "^1.3.8"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "@eslint/compat": "^1.2.7",
-    "@kristiandupont/dev-deps": "^2.32.0",
+    "@kristiandupont/dev-deps": "^2.33.0",
     "@microsoft/api-documenter": "7.26.2",
     "@microsoft/api-extractor": "7.51.1",
     "@types/jsonpath": "0.2.4",
     "@types/pg": "8.11.11",
     "@types/ramda": "0.30.2",
     "np": "10.2.0",
-    "testcontainers": "10.16.0",
-    "vitepress": "1.6.3",
+    "vitepress": "^1.6.3",
     "vue": "3.5.13"
   },
   "np": {},

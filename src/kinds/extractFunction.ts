@@ -1,11 +1,11 @@
 import type { Knex } from "knex";
 
-import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine";
-import type PgType from "./PgType";
+import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine.ts";
+import type PgType from "./PgType.ts";
 import {
   canonicaliseTypes,
   CanonicalType as CanonicalType,
-} from "./query-parts/canonicaliseTypes";
+} from "./query-parts/canonicaliseTypes.ts";
 const parameterModeMap = {
   i: "IN",
   o: "OUT",
@@ -43,7 +43,7 @@ const parallelSafetyMap = {
 type FunctionParallelSafety =
   (typeof parallelSafetyMap)[keyof typeof parallelSafetyMap];
 
-enum FunctionReturnTypeKind {
+export enum FunctionReturnTypeKind {
   Table = "table",
   Regular = "regular",
 }

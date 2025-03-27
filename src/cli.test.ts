@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { createSchemaFilter, parseArgs } from "./cli";
+import { createSchemaFilter, parseArgs } from "./cli.ts";
 
 describe("parseArgs", () => {
   test.each([

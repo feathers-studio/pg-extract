@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
-import fetchTypes from "./fetchTypes";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
+import fetchTypes from "./fetchTypes.ts";
 
 describe("fetchTypes", () => {
   const [getKnex] = useTestKnex();

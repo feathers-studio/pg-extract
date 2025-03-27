@@ -18,7 +18,7 @@ export namespace CanonicalType {
     name: string;
     kind: TypeKind;
     dimensions: number;
-    modifiers: string;
+    modifiers?: string;
   }
 
   export interface Base extends Abstract {

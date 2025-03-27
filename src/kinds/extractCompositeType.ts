@@ -1,11 +1,11 @@
 import type { Knex } from "knex";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn";
-import type PgType from "./PgType";
+import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
+import type PgType from "./PgType.ts";
 import {
   CanonicalType,
   canonicaliseTypes,
-} from "./query-parts/canonicaliseTypes";
+} from "./query-parts/canonicaliseTypes.ts";
 
 /**
  * Attribute of a composite type.

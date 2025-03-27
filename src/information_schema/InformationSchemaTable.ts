@@ -1,4 +1,4 @@
-import type YesNo from "./YesNo";
+import type YesNo from "./YesNo.ts";
 
 /**
  * The view tables contains all tables and views defined in the current database. Only those tables and views are shown that the current user has access to (by way of being the owner or having some privilege).

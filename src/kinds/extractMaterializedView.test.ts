@@ -1,14 +1,14 @@
 import * as R from "ramda";
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
 import type {
   MaterializedViewColumn,
   MaterializedViewDetails,
-} from "./extractMaterializedView";
-import extractMaterializedView from "./extractMaterializedView";
-import type PgType from "./PgType";
+} from "./extractMaterializedView.ts";
+import extractMaterializedView from "./extractMaterializedView.ts";
+import type PgType from "./PgType.ts";
 
 const makePgType = (
   name: string,

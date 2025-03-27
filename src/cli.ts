@@ -4,7 +4,7 @@ import util from "node:util";
 
 import type { ConnectionConfig } from "pg";
 
-import extractSchemas from "./extractSchemas";
+import { Extractor } from "./extractSchemas.ts";
 
 if (util.parseArgs === undefined) {
   console.error(
@@ -29,7 +29,9 @@ async function main(args: string[]) {
 
   const schemaFilter = createSchemaFilter(includePatterns, excludePatterns);
 
-  const allSchemas = await extractSchemas({ ...connectionConfig, password });
+  const extractor = new Extractor({ ...connectionConfig, password });
+
+  const allSchemas = await extractor.extractSchemas();
   // Filter schemas after extracting them all, because we don't know
   // which schemas exist until we've extracted them.
   const schemas = Object.fromEntries(

@@ -1,10 +1,10 @@
-import type { Schema } from "./extractSchemas";
+import type { Schema } from "./extractSchemas.ts";
 import type {
   MaterializedViewColumn,
   MaterializedViewDetails,
-} from "./kinds/extractMaterializedView";
-import type { TableColumn } from "./kinds/extractTable";
-import type { ViewColumn, ViewDetails } from "./kinds/extractView";
+} from "./kinds/extractMaterializedView.ts";
+import type { TableColumn } from "./kinds/extractTable.ts";
+import type { ViewColumn, ViewDetails } from "./kinds/extractView.ts";
 
 type Column = TableColumn | ViewColumn | MaterializedViewColumn;
 
@@ -42,10 +42,8 @@ const resolveViewColumns = (
           return {
             ...column,
             isNullable: sourceColumn.isNullable,
-            reference: sourceColumn.reference,
             references: sourceColumn.references,
             isPrimaryKey: sourceColumn.isPrimaryKey,
-            indices: sourceColumn.indices,
           };
         }
       }

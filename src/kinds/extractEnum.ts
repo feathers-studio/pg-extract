@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 
-import type PgType from "./PgType";
+import type PgType from "./PgType.ts";
 
 /**
  * Enum type in a schema.

@@ -1,8 +1,8 @@
 import * as R from "ramda";
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema";
-import useTestKnex from "../tests/useTestKnex";
+import useSchema from "../tests/useSchema.ts";
+import useTestKnex from "../tests/useTestKnex.ts";
 import type {
   ColumnReference,
   Index,
@@ -11,9 +11,10 @@ import type {
   TableDetails,
   TableIndex,
   TableSecurityPolicy,
-} from "./extractTable";
-import extractTable from "./extractTable";
-import type PgType from "./PgType";
+} from "./extractTable.ts";
+import extractTable from "./extractTable.ts";
+import type PgType from "./PgType.ts";
+import { CanonicalType } from "./query-parts/canonicaliseTypes.ts";
 
 const makePgType = (name: string, schemaName = "test"): PgType<"table"> => ({
   schemaName,
@@ -57,21 +58,22 @@ describe("extractTable", () => {
       columns: [
         {
           name: "id",
-          expandedType: "pg_catalog.int4",
-          type: { fullName: "pg_catalog.int4", kind: "base" },
-          isArray: false,
-          dimensions: 0,
+          type: {
+            canonical_name: "pg_catalog.int4",
+            kind: CanonicalType.TypeKind.Base,
+            schema: "pg_catalog",
+            name: "int4",
+            dimensions: 0,
+            original_type: "pg_catalog.int4",
+          },
           references: [],
-          reference: null,
           defaultValue: null,
-          indices: [],
           isNullable: true,
           isPrimaryKey: false,
           generated: "NEVER",
           isUpdatable: true,
           isIdentity: false,
           ordinalPosition: 1,
-          maxLength: null,
           comment: null,
 
           informationSchemaValue: {
@@ -147,29 +149,40 @@ describe("extractTable", () => {
     );
 
     const result = await extractTable(db, makePgType("some_table"));
-    const actual = R.map(
-      R.pick(["name", "expandedType", "type", "dimensions"]),
-      result.columns,
-    );
 
-    const expected: Partial<TableColumn>[] = [
+    const actual = result.columns.map((column) => ({
+      name: column.name,
+      type: {
+        canonical_name: column.type.canonical_name,
+        kind: column.type.kind,
+        dimensions: column.type.dimensions,
+      },
+    }));
+
+    const expected: typeof actual = [
       {
         name: "array_of_ints",
-        expandedType: "pg_catalog.int4[]",
-        type: { fullName: "pg_catalog.int4", kind: "base" },
-        dimensions: 1,
+        type: {
+          canonical_name: "pg_catalog.int4[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
+        },
       },
       {
         name: "array_of_strings",
-        expandedType: "pg_catalog.text[]",
-        type: { fullName: "pg_catalog.text", kind: "base" },
-        dimensions: 1,
+        type: {
+          canonical_name: "pg_catalog.text[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
+        },
       },
       {
         name: "two_dimensional_array",
-        expandedType: "pg_catalog.int4[][]",
-        type: { fullName: "pg_catalog.int4", kind: "base" },
-        dimensions: 2,
+        type: {
+          canonical_name: "pg_catalog.int4[][]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 2,
+        },
       },
     ];
     expect(actual).toEqual(expected);
@@ -219,71 +232,80 @@ describe("extractTable", () => {
     );
 
     const result = await extractTable(db, makePgType("some_table"));
-    const actual = R.map(
-      R.pick(["name", "expandedType", "type", "dimensions"]),
-      result.columns,
-    );
 
-    const expected: Partial<TableColumn>[] = [
+    const actual = result.columns.map((column) => ({
+      name: column.name,
+      type: {
+        canonical_name: column.type.canonical_name,
+        kind: column.type.kind,
+        dimensions: column.type.dimensions,
+      },
+    }));
+
+    const expected: typeof actual = [
       {
         name: "d",
-        expandedType: "test.some_domain",
         type: {
-          fullName: "test.some_domain",
-          kind: "domain",
+          canonical_name: "test.some_domain",
+          kind: CanonicalType.TypeKind.Domain,
+          dimensions: 0,
         },
-        dimensions: 0,
       },
       {
         name: "c",
-        expandedType: "test.some_composite",
-        type: { fullName: "test.some_composite", kind: "composite" },
-        dimensions: 0,
+        type: {
+          canonical_name: "test.some_composite",
+          kind: CanonicalType.TypeKind.Composite,
+          dimensions: 0,
+        },
       },
       {
         name: "r",
-        expandedType: "test.some_range",
         type: {
-          fullName: "test.some_range",
-          kind: "range",
+          canonical_name: "test.some_range",
+          kind: CanonicalType.TypeKind.Range,
+          dimensions: 0,
         },
-        dimensions: 0,
       },
       {
         name: "e",
-        expandedType: "test.some_enum",
-        type: { fullName: "test.some_enum", kind: "enum" },
-        dimensions: 0,
+        type: {
+          canonical_name: "test.some_enum",
+          kind: CanonicalType.TypeKind.Enum,
+          dimensions: 0,
+        },
       },
       {
         name: "d_a",
-        expandedType: "test.some_domain[]",
         type: {
-          fullName: "test.some_domain",
-          kind: "domain",
+          canonical_name: "test.some_domain[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
         },
-        dimensions: 1,
       },
       {
         name: "c_a",
-        expandedType: "test.some_composite[]",
-        type: { fullName: "test.some_composite", kind: "composite" },
-        dimensions: 1,
+        type: {
+          canonical_name: "test.some_composite[]",
+          kind: CanonicalType.TypeKind.Composite,
+          dimensions: 1,
+        },
       },
       {
         name: "r_a",
-        expandedType: "test.some_range[]",
         type: {
-          fullName: "test.some_range",
-          kind: "range",
+          canonical_name: "test.some_range[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
         },
-        dimensions: 1,
       },
       {
         name: "e_a",
-        expandedType: "test.some_enum[]",
-        type: { fullName: "test.some_enum", kind: "enum" },
-        dimensions: 1,
+        type: {
+          canonical_name: "test.some_enum[]",
+          kind: CanonicalType.TypeKind.Base,
+          dimensions: 1,
+        },
       },
     ];
 
@@ -311,9 +333,6 @@ describe("extractTable", () => {
         name: "linking_table_some_table_id_fkey",
       };
       expect(result.columns[0].references).toEqual([expected]);
-
-      // Check that deprecated version still works:
-      expect(result.columns[0].reference).toEqual(expected);
     });
 
     it("should extract a foreign key with a different schema", async () => {
@@ -603,16 +622,6 @@ describe("extractTable", () => {
           name: "fk_2",
         },
       ]);
-
-      // Check deprecated version still works:
-      expect(result.columns[0].reference).toEqual({
-        schemaName: "test",
-        tableName: "some_table",
-        columnName: "id",
-        onDelete: "NO ACTION",
-        onUpdate: "NO ACTION",
-        name: "fk_1",
-      });
     });
 
     it("should not extract indices from another schema", async () => {
@@ -632,7 +641,7 @@ describe("extractTable", () => {
         },
       ];
 
-      expect(result.columns[0].indices).toStrictEqual(expected);
+      expect(result.indices).toStrictEqual(expected);
     });
   });
 });
