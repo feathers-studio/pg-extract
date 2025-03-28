@@ -1,58 +1,49 @@
-import knex, { type Knex } from "knex";
 import { afterAll, beforeAll } from "vitest";
 
-import usePostgresContainer from "./usePostgresContainer";
+import knex, { type Knex } from "knex";
+import { PGlite } from "@electric-sql/pglite";
+import ClientPGLite from "knex-pglite";
+
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
+import { citext } from "@electric-sql/pglite/contrib/citext";
 
 const useTestKnex = (): readonly [() => Knex<any, any[]>, string] => {
   let knexInstance: Knex;
-  const databaseName = `test_${Math.ceil(Math.random() * 1000)}`;
 
-  const getContainer = usePostgresContainer();
+  const database = `test_${Math.ceil(Math.random() * 1000)}`;
+  const pglite = new PGlite("memory://", {
+    database,
+    extensions: { pg_trgm, citext },
+  });
+
+  const config = {
+    client: ClientPGLite,
+    dialect: "postgres",
+    connection: { pglite } as any,
+  };
+
+  const dbConfig = {
+    ...config,
+    connection: { ...config.connection, database },
+  };
 
   beforeAll(async () => {
-    const container = getContainer();
-    const connection = {
-      host: container.getHost(),
-      port: container.getMappedPort(5432),
-      password: "postgres",
-      user: "postgres",
-    };
-
-    const setupKnexInstance = knex({
-      client: "postgres",
-      connection: { ...connection, database: "postgres" },
-    });
-    await setupKnexInstance.raw("create database ??", [databaseName]);
-    await setupKnexInstance.destroy();
-
-    knexInstance = knex({
-      client: "postgres",
-      connection: { ...connection, database: databaseName },
-    });
+    knexInstance = knex(dbConfig);
+    console.log("created database", database);
   });
 
   afterAll(async () => {
-    const container = getContainer();
-    const connection = {
-      host: container.getHost(),
-      port: container.getMappedPort(5432),
-      password: "postgres",
-      user: "postgres",
-    };
-
-    const setupKnexInstance = knex({
-      client: "postgres",
-      connection: { ...connection, database: "postgres" },
-    });
+    const setupKnexInstance = knex(dbConfig);
 
     setupKnexInstance
-      .raw(`drop database ${databaseName} with (force)`)
+      .raw(`drop database ${database} with (force)`)
       .then(() => setupKnexInstance.destroy());
 
     await knexInstance.destroy();
+    console.log("dropped database", database);
   });
 
-  return [() => knexInstance, databaseName] as const;
+  return [() => knexInstance, database] as const;
 };
 
 export default useTestKnex;

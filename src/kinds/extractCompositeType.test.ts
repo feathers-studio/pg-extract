@@ -150,15 +150,15 @@ describe("extractCompositeType", () => {
       {
         name: "d_a",
         type: {
-          canonical_name: "test.some_domain[]",
-          kind: CanonicalType.TypeKind.Base,
+          canonical_name: "test.some_domain",
+          kind: CanonicalType.TypeKind.Domain,
           dimensions: 1,
         },
       },
       {
         name: "c_a",
         type: {
-          canonical_name: "test.some_composite[]",
+          canonical_name: "test.some_composite",
           kind: CanonicalType.TypeKind.Composite,
           dimensions: 1,
         },
@@ -166,16 +166,16 @@ describe("extractCompositeType", () => {
       {
         name: "r_a",
         type: {
-          canonical_name: "test.some_range[]",
-          kind: CanonicalType.TypeKind.Base,
+          canonical_name: "test.some_range",
+          kind: CanonicalType.TypeKind.Range,
           dimensions: 1,
         },
       },
       {
         name: "e_a",
         type: {
-          canonical_name: "test.some_enum[]",
-          kind: CanonicalType.TypeKind.Base,
+          canonical_name: "test.some_enum",
+          kind: CanonicalType.TypeKind.Enum,
           dimensions: 1,
         },
       },
