@@ -22,6 +22,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "build": "tsc",
+    "prepare": "npm run build",
     "lint": "eslint . --report-unused-disable-directives",
     "test": "vitest run",
     "version": "npm run build",
