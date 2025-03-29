@@ -1,6 +1,6 @@
 {
   "name": "pg-extract",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "keywords": [
     "postgresql",
     "schema"
@@ -12,12 +12,12 @@
     "name": "Feathers Studio",
     "url": "https://feathers.studio"
   },
-  "main": "src/index.ts",
+  "main": "lib/index.js",
   "bin": {
     "pg-extract": "bin/pg-extract"
   },
   "files": [
-    "build/"
+    "lib/"
   ],
   "scripts": {
     "check": "tsc --noEmit",

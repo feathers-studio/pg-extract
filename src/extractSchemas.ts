@@ -1,7 +1,6 @@
 import type { Knex } from "knex";
 import knex from "knex";
 import ClientPgLite from "knex-pglite";
-import type { ConnectionConfig } from "pg";
 import * as R from "ramda";
 
 import type { CompositeTypeDetails } from "./kinds/extractCompositeType.ts";
@@ -156,7 +155,7 @@ export class Extractor {
   /**
    * @param connectionConfig - Connection string or configuration object for Postgres connection
    */
-  constructor(connectionConfig: string | ConnectionConfig) {
+  constructor(connectionConfig: string | Knex.ConnectionConfig) {
     const connection = connectionConfig;
     if (typeof connection === "string" && connection.startsWith("file:"))
       this.db = knex({

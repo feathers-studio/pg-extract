@@ -2,7 +2,7 @@
 import { createInterface } from "node:readline";
 import util from "node:util";
 
-import type { ConnectionConfig } from "pg";
+import type { Knex } from "knex";
 
 import { Extractor } from "./extractSchemas.ts";
 
@@ -48,7 +48,7 @@ type ParsedArgs =
   | { help: true }
   | {
       help: false;
-      connectionConfig: ConnectionConfig;
+      connectionConfig: Knex.ConnectionConfig;
       includePatterns: string[];
       excludePatterns: string[];
     };
@@ -75,9 +75,10 @@ export function parseArgs(args: string[]): ParsedArgs {
   return {
     help: false,
     connectionConfig: {
-      host: values.host,
+      host: values.host ?? "localhost",
+      // @ts-expect-error This CLI will have to be rewritten at some point
       port: values.port === undefined ? undefined : Number(values.port),
-      user: values.username,
+      user: values.username ?? "postgres",
       database: values.dbname ?? positionals[0],
     },
     includePatterns: values.schema ?? [],
