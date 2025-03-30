@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
 import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
@@ -164,14 +164,13 @@ WHERE
 `;
 
 const extractMaterializedView = async (
-  db: Knex,
+  pg: Client,
   materializedView: PgType<"materializedView">,
 ): Promise<MaterializedViewDetails> => {
-  const fakeInformationSchemaValueQuery = await db.raw(
+  const fakeInformationSchemaValueQuery = await pg.query<InformationSchemaView>(
     fakeInformationSchemaViewsQueryPart,
   );
-  const fakeInformationSchemaValue: InformationSchemaView =
-    fakeInformationSchemaValueQuery.rows[0];
+  const fakeInformationSchemaValue = fakeInformationSchemaValueQuery.rows[0];
 
   // const [{ definition }] = await db
   //   .select<{ definition: string }[]>('definition')
@@ -181,7 +180,7 @@ const extractMaterializedView = async (
   //     schemaname: view.schemaName,
   //   });
 
-  const columnsQuery = await db.raw(
+  const columnsQuery = await pg.query<MaterializedViewColumn>(
     `
     WITH 
     fake_info_schema_columns AS (
@@ -217,13 +216,10 @@ const extractMaterializedView = async (
       LEFT JOIN type_map ON type_map.column_name = columns.column_name
       LEFT JOIN comment_map ON comment_map.column_name = columns.column_name
     WHERE
-      table_name = :table_name
-      AND table_schema = :schema_name;
+      table_name = $1
+      AND table_schema = $2;
   `,
-    {
-      table_name: materializedView.name,
-      schema_name: materializedView.schemaName,
-    },
+    [materializedView.name, materializedView.schemaName],
   );
 
   const columns = columnsQuery.rows;

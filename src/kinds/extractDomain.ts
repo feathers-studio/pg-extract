@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type InformationSchemaDomain from "../information_schema/InformationSchemaDomain.ts";
 import type PgType from "./PgType.ts";
@@ -19,10 +19,16 @@ export interface DomainDetails extends PgType<"domain"> {
 }
 
 const extractDomain = async (
-  db: Knex,
+  pg: Client,
   domain: PgType<"domain">,
 ): Promise<DomainDetails> => {
-  const query = await db.raw(
+  const query = await pg.query<
+    {
+      innerType: string;
+      informationSchemaValue: InformationSchemaDomain;
+    },
+    [domain_name: string, schema_name: string]
+  >(
     `
     SELECT
       i.typnamespace::regnamespace::text||'.'||i.typname as "innerType",
@@ -32,13 +38,13 @@ const extractDomain = async (
       pg_type t
     JOIN pg_type i on t.typbasetype = i.oid
     WHERE
-      domain_name = :domain_name
-      AND t.typname = :domain_name
+      domain_name = $1
+      AND t.typname = $1
       AND t.typtype = 'd'
-      AND domain_schema = :schema_name
-      AND t.typnamespace::regnamespace::text = :schema_name
+      AND domain_schema = $2
+      AND t.typnamespace::regnamespace::text = $2
     `,
-    { domain_name: domain.name, schema_name: domain.schemaName },
+    [domain.name, domain.schemaName],
   );
 
   return {

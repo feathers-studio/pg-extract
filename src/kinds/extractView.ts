@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 import * as R from "ramda";
 
 import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
@@ -185,18 +185,21 @@ const resolveSource = (
 });
 
 const extractView = async (
-  db: Knex,
+  pg: Client,
   view: PgType<"view">,
 ): Promise<ViewDetails> => {
-  const [informationSchemaValue] = await db
-    .from("information_schema.views")
-    .where({
-      table_name: view.name,
-      table_schema: view.schemaName,
-    })
-    .select<InformationSchemaView[]>("*");
+  const [informationSchemaValue] = (
+    await pg.query<InformationSchemaView>(
+      `
+    SELECT * FROM information_schema.views
+    WHERE table_name = $1
+    AND table_schema = $2;
+  `,
+      [view.name, view.schemaName],
+    )
+  ).rows;
 
-  const columnsQuery = await db.raw(
+  const columnsQuery = await pg.query<ViewColumn>(
     `
     WITH 
     type_map AS (
@@ -228,14 +231,19 @@ const extractView = async (
       LEFT JOIN type_map ON type_map.column_name = columns.column_name
       LEFT JOIN comment_map ON comment_map.column_name = columns.column_name
     WHERE
-      table_name = :table_name
-      AND table_schema = :schema_name;
+      table_name = $1
+      AND table_schema = $2;
   `,
-    { table_name: view.name, schema_name: view.schemaName },
+    [view.name, view.schemaName],
   );
 
-  const viewOptionsQuery = await db.raw(
-    `
+  const viewOptionsQuery = (
+    await pg.query<{
+      check_option: string | null;
+      security_barrier: boolean;
+      security_invoker: boolean;
+    }>(
+      `
     SELECT
       CASE 
         WHEN c.relkind = 'v' THEN (
@@ -256,11 +264,12 @@ const extractView = async (
       ), false) as security_invoker
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = :schema_name
-    AND c.relname = :table_name
+    WHERE n.nspname = $1
+    AND c.relname = $2
   `,
-    { table_name: view.name, schema_name: view.schemaName },
-  );
+      [view.schemaName, view.name],
+    )
+  ).rows;
 
   const unresolvedColumns: ViewColumn[] = columnsQuery.rows;
   let sourceMapping: Record<string, ViewReference> | undefined;
@@ -286,9 +295,12 @@ const extractView = async (
     informationSchemaValue,
     columns,
     options: {
-      checkOption: viewOptionsQuery.rows[0].check_option,
-      securityBarrier: viewOptionsQuery.rows[0].security_barrier,
-      securityInvoker: viewOptionsQuery.rows[0].security_invoker,
+      checkOption: viewOptionsQuery[0].check_option as
+        | "local"
+        | "cascaded"
+        | null,
+      securityBarrier: viewOptionsQuery[0].security_barrier,
+      securityInvoker: viewOptionsQuery[0].security_invoker,
     },
   };
 };

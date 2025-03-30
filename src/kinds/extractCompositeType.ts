@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
 import type PgType from "./PgType.ts";
@@ -74,14 +74,14 @@ export interface CompositeTypeDetails extends PgType<"composite"> {
 }
 
 const extractCompositeType = async (
-  db: Knex,
+  pg: Client,
   composite: PgType<"composite">,
 ): Promise<CompositeTypeDetails> => {
   // Form the fully qualified type name
   const fullTypeName = `${composite.schemaName}.${composite.name}`;
 
   // Get canonical type information with all the metadata
-  const canonicalTypes = await canonicaliseTypes(db, [fullTypeName]);
+  const canonicalTypes = await canonicaliseTypes(pg, [fullTypeName]);
 
   // The result should be a Composite type
   const canonicalType = canonicalTypes[0] as CanonicalType.Composite;

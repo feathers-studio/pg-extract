@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
 import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
@@ -139,18 +139,21 @@ WHERE
 `;
 
 const extractForeignTable = async (
-  db: Knex,
+  pg: Client,
   foreignTable: PgType<"foreignTable">,
 ): Promise<ForeignTableDetails> => {
-  const [informationSchemaValue] = await db
-    .from("information_schema.tables")
-    .where({
-      table_name: foreignTable.name,
-      table_schema: foreignTable.schemaName,
-    })
-    .select<InformationSchemaView[]>("*");
+  const [informationSchemaValue] = (
+    await pg.query<InformationSchemaView>(
+      `
+    SELECT * FROM information_schema.tables
+    WHERE table_name = $1
+    AND table_schema = $2;
+  `,
+      [foreignTable.name, foreignTable.schemaName],
+    )
+  ).rows;
 
-  const columnsQuery = await db.raw(
+  const columnsQuery = await pg.query<ForeignTableColumn>(
     `
     WITH 
     type_map AS (
@@ -182,10 +185,10 @@ const extractForeignTable = async (
       LEFT JOIN type_map ON type_map.column_name = columns.column_name
       LEFT JOIN comment_map ON comment_map.column_name = columns.column_name
     WHERE
-      table_name = :table_name
-      AND table_schema = :schema_name;
+      table_name = $1
+      AND table_schema = $2;
   `,
-    { table_name: foreignTable.name, schema_name: foreignTable.schemaName },
+    [foreignTable.name, foreignTable.schemaName],
   );
 
   const columns: ForeignTableColumn[] = columnsQuery.rows;

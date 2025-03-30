@@ -1,78 +1,87 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import fetchExtensionItemIds from "../fetchExtensionItemIds.ts";
 import type PgType from "./PgType.ts";
 import { classKindMap, typeKindMap } from "./PgType.ts";
 
 const fetchTypes = async (
-  db: Knex,
+  pg: Client,
   schemaNames: string[],
 ): Promise<PgType[]> => {
   // We want to ignore everything belonging to etensions. (Maybe this should be optional?)
-  const { extClassOids, extTypeOids } = await fetchExtensionItemIds(db);
+  const { extClassOids, extTypeOids } = await fetchExtensionItemIds(pg);
 
-  const typeQuery = db
-    .select(
-      "typname as name",
-      "nspname as schemaName",
-      db.raw(`case typtype
-        when 'c' then case relkind
-          ${Object.entries(classKindMap)
-            .map(([key, classKind]) => `when '${key}' then '${classKind}'`)
+  const typeQuery = (
+    await pg.query<{
+      name: string;
+      schemaName: string;
+      kind: PgType["kind"];
+      comment: string;
+    }>(`
+    SELECT
+        typname as name,
+        nspname as schemaName,
+        case typtype
+          when 'c' then case relkind
+            ${Object.entries(classKindMap)
+              .map(([key, classKind]) => `when '${key}' then '${classKind}'`)
+              .join("\n")}
+            end
+          ${Object.entries(typeKindMap)
+            .map(([key, typeKind]) => `when '${key}' then '${typeKind}'`)
             .join("\n")}
-          end
-      ${Object.entries(typeKindMap)
-        .map(([key, typeKind]) => `when '${key}' then '${typeKind}'`)
-        .join("\n")}
-       end as kind`),
-      db.raw(
-        // Comments on the class take prescedent, but for composite types,
-        // they will reside on the type itself.
-        `COALESCE(
+        end as kind,
+        COALESCE(
           obj_description(COALESCE(pg_class.oid, pg_type.oid)),
           obj_description(pg_type.oid)
-        ) as comment`,
-      ),
-    )
-    .from("pg_catalog.pg_type")
-    .join("pg_catalog.pg_namespace", "pg_namespace.oid", "pg_type.typnamespace")
-    .fullOuterJoin("pg_catalog.pg_class", "pg_type.typrelid", "pg_class.oid")
-    .where((b1) =>
-      b1
-        .where("pg_class.oid", "is", null)
-        .orWhere((b2) =>
-          b2
-            .where("pg_class.relispartition", false)
-            .whereNotIn("pg_class.relkind", ["S"])
-            .whereNotIn("pg_class.oid", extClassOids),
-        ),
-    )
-    .whereNotIn("pg_type.oid", extTypeOids)
-    .whereIn("pg_type.typtype", ["c", ...Object.keys(typeKindMap)])
-    .whereIn("pg_namespace.nspname", schemaNames);
+        ) as comment
+      FROM pg_catalog.pg_type
+      JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
+      FULL OUTER JOIN pg_catalog.pg_class ON pg_type.typrelid = pg_class.oid
+      WHERE (
+        pg_class.oid IS NULL
+        OR (
+          pg_class.relispartition = false
+          AND pg_class.relkind NOT IN ('S')
+          AND pg_class.oid NOT IN (${extClassOids.join(", ")})
+        )
+      )
+      AND pg_type.oid NOT IN (${extTypeOids.join(", ")})
+      AND pg_type.typtype IN ('c', ${Object.keys(typeKindMap)
+        .map((key) => `'${key}'`)
+        .join(", ")})
+      AND pg_namespace.nspname IN (${schemaNames.map((name) => `'${name}'`).join(", ")})
+  `)
+  ).rows;
 
-  const procQuery = db
-    .select(
-      "proname as name",
-      "nspname as schemaName",
-      db.raw(`case prokind
+  const procQuery = (
+    await pg.query<{
+      name: string;
+      schemaName: string;
+      kind: PgType["kind"];
+      comment: string;
+    }>(`
+    SELECT
+      proname as name,
+      nspname as schemaName,
+      case prokind
         when 'f' then 'function'
         when 'p' then 'procedure'
         when 'a' then 'aggregate'
         when 'w' then 'window'
-        end as kind`),
-      db.raw("obj_description(pg_proc.oid) as comment"),
-    )
-    .from("pg_catalog.pg_proc")
-    .join("pg_catalog.pg_namespace", "pg_namespace.oid", "pg_proc.pronamespace")
-    .join("pg_catalog.pg_language", "pg_language.oid", "pg_proc.prolang")
-    .whereNotIn("pg_proc.oid", extClassOids)
-    .whereIn("pg_namespace.nspname", schemaNames)
-    // .whereIn("prokind", ["f", "p", "a", "w"])
-    .whereIn("prokind", ["f", "p"]) // TODO: Add support for aggregate and window functions
-    .whereNot("pg_language.lanname", "internal");
+      end as kind,
+      obj_description(pg_proc.oid) as comment
+    FROM pg_catalog.pg_proc
+    JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_proc.pronamespace
+    JOIN pg_catalog.pg_language ON pg_language.oid = pg_proc.prolang
+    WHERE pg_proc.oid NOT IN (${extClassOids.join(", ")})
+    AND pg_namespace.nspname IN (${schemaNames.map((name) => `'${name}'`).join(", ")})
+    AND prokind IN ('f', 'p') -- TODO: Add support for aggregate and window functions
+    AND pg_language.lanname != 'internal'
+  `)
+  ).rows;
 
-  return typeQuery.union(procQuery);
+  return [...typeQuery, ...procQuery];
 };
 
 export default fetchTypes;

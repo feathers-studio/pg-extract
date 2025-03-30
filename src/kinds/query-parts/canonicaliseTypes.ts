@@ -1,95 +1,95 @@
-import { type Knex } from "knex";
+import { Client } from "pg";
 
 export namespace CanonicalType {
-  export enum TypeKind {
-    Base = "base",
-    Composite = "composite",
-    Domain = "domain",
-    Enum = "enum",
-    Range = "range",
-    Pseudo = "pseudo",
-    Unknown = "unknown",
-  }
+	export enum TypeKind {
+		Base = "base",
+		Composite = "composite",
+		Domain = "domain",
+		Enum = "enum",
+		Range = "range",
+		Pseudo = "pseudo",
+		Unknown = "unknown",
+	}
 
-  interface Abstract {
-    original_type: string;
-    canonical_name: string;
-    schema: string;
-    name: string;
-    kind: TypeKind;
-    dimensions: number;
-    modifiers?: string;
-  }
+	interface Abstract {
+		original_type: string;
+		canonical_name: string;
+		schema: string;
+		name: string;
+		kind: TypeKind;
+		dimensions: number;
+		modifiers?: string;
+	}
 
-  export interface Base extends Abstract {
-    kind: TypeKind.Base;
-  }
+	export interface Base extends Abstract {
+		kind: TypeKind.Base;
+	}
 
-  export interface Enum extends Abstract {
-    kind: TypeKind.Enum;
-    enum_values: string[];
-  }
+	export interface Enum extends Abstract {
+		kind: TypeKind.Enum;
+		enum_values: string[];
+	}
 
-  // Enhanced attribute with additional metadata
-  export interface CompositeAttribute {
-    name: string;
-    index: number;
-    type: CanonicalType;
-    comment: string | null;
-    defaultValue: any;
-    isNullable: boolean;
-    /**
-     * Whether the attribute is an identity attribute.
-     */
-    isIdentity: boolean;
-    /**
-     * Behavior of the generated attribute. "ALWAYS" if always generated,
-     * "NEVER" if never generated, "BY DEFAULT" if generated when a value
-     * is not provided.
-     */
-    generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
-  }
+	// Enhanced attribute with additional metadata
+	export interface CompositeAttribute {
+		name: string;
+		index: number;
+		type: CanonicalType;
+		comment: string | null;
+		defaultValue: any;
+		isNullable: boolean;
+		/**
+		 * Whether the attribute is an identity attribute.
+		 */
+		isIdentity: boolean;
+		/**
+		 * Behavior of the generated attribute. "ALWAYS" if always generated,
+		 * "NEVER" if never generated, "BY DEFAULT" if generated when a value
+		 * is not provided.
+		 */
+		generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
+	}
 
-  export interface Composite extends Abstract {
-    kind: TypeKind.Composite;
-    attributes: CompositeAttribute[];
-  }
+	export interface Composite extends Abstract {
+		kind: TypeKind.Composite;
+		attributes: CompositeAttribute[];
+	}
 
-  export interface Domain extends Abstract {
-    kind: TypeKind.Domain;
-    domain_base_type: {
-      canonical_name: string;
-      schema: string;
-      name: string;
-    };
-  }
+	export interface Domain extends Abstract {
+		kind: TypeKind.Domain;
+		domain_base_type: {
+			canonical_name: string;
+			schema: string;
+			name: string;
+		};
+	}
 
-  export interface Range extends Abstract {
-    kind: TypeKind.Range;
-    range_subtype: string | null;
-  }
+	export interface Range extends Abstract {
+		kind: TypeKind.Range;
+		range_subtype: string | null;
+	}
 
-  export interface Pseudo extends Abstract {
-    kind: TypeKind.Pseudo;
-  }
+	export interface Pseudo extends Abstract {
+		kind: TypeKind.Pseudo;
+	}
 }
 export type CanonicalType =
-  | CanonicalType.Base
-  | CanonicalType.Enum
-  | CanonicalType.Composite
-  | CanonicalType.Domain
-  | CanonicalType.Range
-  | CanonicalType.Pseudo;
+	| CanonicalType.Base
+	| CanonicalType.Enum
+	| CanonicalType.Composite
+	| CanonicalType.Domain
+	| CanonicalType.Range
+	| CanonicalType.Pseudo;
 
 export const canonicaliseTypes = async (
-  db: Knex,
-  types: string[],
+	pg: Client,
+	types: string[],
 ): Promise<CanonicalType[]> => {
-  if (types.length === 0) return [];
+	if (types.length === 0) return [];
 
-  const placeholders = types.map((_, i) => `(?, ${i})`).join(", ");
+	const placeholders = types.map((_, i) => `(?, ${i})`).join(", ");
 
-  const query = `
+	const query = `
       WITH RECURSIVE 
       -- Parameters with sequence numbers to preserve order
       input(type_name, seq) AS (
@@ -274,58 +274,58 @@ export const canonicaliseTypes = async (
       ORDER BY b.seq;
     `;
 
-  interface Resolved {
-    type_info:
-      | Exclude<CanonicalType, CanonicalType.Composite>
-      | (Omit<CanonicalType.Composite, "attributes"> & {
-          kind: CanonicalType.TypeKind;
-          attributes: {
-            name: string;
-            index: number;
-            type_oid: number;
-            type_name: string;
-            comment: string | null;
-            defaultValue: any;
-            isNullable: boolean;
-            isIdentity: boolean;
-            generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
-          }[];
-        });
-  }
+	interface Resolved {
+		type_info:
+			| Exclude<CanonicalType, CanonicalType.Composite>
+			| (Omit<CanonicalType.Composite, "attributes"> & {
+					kind: CanonicalType.TypeKind;
+					attributes: {
+						name: string;
+						index: number;
+						type_oid: number;
+						type_name: string;
+						comment: string | null;
+						defaultValue: any;
+						isNullable: boolean;
+						isIdentity: boolean;
+						generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
+					}[];
+			  });
+	}
 
-  const resolved = (await db.raw(query, types)).rows as Resolved[];
-  return Promise.all(
-    resolved
-      .map((each) => each.type_info)
-      .map(async (each) => {
-        if (each.kind === CanonicalType.TypeKind.Composite) {
-          const types = each.attributes.map((each) => each.type_name);
-          const canonical = await canonicaliseTypes(db, types);
+	const resolved = (await pg.query(query, types)).rows as Resolved[];
+	return Promise.all(
+		resolved
+			.map(each => each.type_info)
+			.map(async each => {
+				if (each.kind === CanonicalType.TypeKind.Composite) {
+					const types = each.attributes.map(each => each.type_name);
+					const canonical = await canonicaliseTypes(pg, types);
 
-          const attributes: CanonicalType.CompositeAttribute[] =
-            await Promise.all(
-              each.attributes.map(async (each, index) => {
-                return {
-                  name: each.name,
-                  index: each.index,
-                  type: canonical[index],
-                  comment: each.comment,
-                  defaultValue: each.defaultValue,
-                  isNullable: each.isNullable,
-                  isIdentity: each.isIdentity,
-                  generated: each.generated,
-                };
-              }),
-            );
+					const attributes: CanonicalType.CompositeAttribute[] =
+						await Promise.all(
+							each.attributes.map(async (each, index) => {
+								return {
+									name: each.name,
+									index: each.index,
+									type: canonical[index],
+									comment: each.comment,
+									defaultValue: each.defaultValue,
+									isNullable: each.isNullable,
+									isIdentity: each.isIdentity,
+									generated: each.generated,
+								};
+							}),
+						);
 
-          return {
-            ...each,
-            kind: CanonicalType.TypeKind.Composite,
-            attributes,
-          } satisfies CanonicalType.Composite;
-        }
+					return {
+						...each,
+						kind: CanonicalType.TypeKind.Composite,
+						attributes,
+					} satisfies CanonicalType.Composite;
+				}
 
-        return each satisfies CanonicalType;
-      }),
-  );
+				return each satisfies CanonicalType;
+			}),
+	);
 };

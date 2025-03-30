@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type PgType from "./PgType.ts";
 
@@ -13,10 +13,13 @@ export interface EnumDetails extends PgType<"enum"> {
 }
 
 const extractEnum = async (
-  db: Knex,
+  pg: Client,
   pgEnum: PgType<"enum">,
 ): Promise<EnumDetails> => {
-  const query = await db.raw(
+  const query = await pg.query<
+    { values: string[] },
+    [name: string, schemaName: string]
+  >(
     `
     SELECT
       json_agg(pg_enum.enumlabel ORDER BY pg_enum.enumsortorder) as "values"
@@ -26,10 +29,10 @@ const extractEnum = async (
       JOIN pg_enum ON pg_type.oid = pg_enum.enumtypid
     WHERE
       pg_type.typtype = 'e'
-      AND pg_namespace.nspname = :schema_name
-      AND typname = :type_name
+      AND pg_namespace.nspname = $2
+      AND typname = $1
     `,
-    { type_name: pgEnum.name, schema_name: pgEnum.schemaName },
+    [pgEnum.name, pgEnum.schemaName],
   );
 
   return {

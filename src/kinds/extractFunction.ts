@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine.ts";
 import type PgType from "./PgType.ts";
@@ -77,16 +77,19 @@ export interface FunctionDetails extends PgType<"function"> {
 }
 
 async function extractFunction(
-  db: Knex,
+  pg: Client,
   pgType: PgType<"function">,
 ): Promise<FunctionDetails[]> {
-  const [informationSchemaValue] = await db
-    .from("information_schema.routines")
-    .where({
-      routine_name: pgType.name,
-      routine_schema: pgType.schemaName,
-    })
-    .select("*");
+  const [informationSchemaValue] = (
+    await pg.query<InformationSchemaRoutine>(
+      `
+    SELECT * FROM information_schema.routines
+    WHERE routine_name = $1
+    AND routine_schema = $2;
+  `,
+      [pgType.name, pgType.schemaName],
+    )
+  ).rows;
 
   const query = `
     SELECT
@@ -122,38 +125,36 @@ async function extractFunction(
     LEFT JOIN pg_language l ON l.oid = p.prolang
     LEFT JOIN pg_type t ON t.oid = p.prorettype
     LEFT JOIN pg_namespace ns ON t.typnamespace = ns.oid
-    WHERE n.nspname = ? AND p.proname = ?
+    WHERE n.nspname = $1 AND p.proname = $2
   `;
 
-  const { rows } = (await db.raw(query, [pgType.schemaName, pgType.name])) as {
-    rows: {
-      name: string;
-      language: string;
-      definition: string;
-      is_strict: boolean;
-      is_security_definer: boolean;
-      is_leak_proof: boolean;
-      volatility: "i" | "s" | "v";
-      parallel_safety: "s" | "r" | "u";
-      estimated_cost: number;
-      estimated_rows: number | null;
-      comment: string | null;
-      prorettype: string;
-      arg_names: string[] | null;
-      arg_modes: ("i" | "o" | "b" | "v" | "t")[] | null;
-      arg_types: string[] | null;
-      default_arg_count: number;
-      arg_defaults: string | null;
-      arg_list: string;
-      identity_args: string;
-      return_type: string;
-      full_return_type: string;
-      returns_array: boolean;
-      returns_set: boolean;
-      return_dimensions: number;
-      typelem: number;
-    }[];
-  };
+  const { rows } = await pg.query<{
+    name: string;
+    language: string;
+    definition: string;
+    is_strict: boolean;
+    is_security_definer: boolean;
+    is_leak_proof: boolean;
+    volatility: "i" | "s" | "v";
+    parallel_safety: "s" | "r" | "u";
+    estimated_cost: number;
+    estimated_rows: number | null;
+    comment: string | null;
+    prorettype: string;
+    arg_names: string[] | null;
+    arg_modes: ("i" | "o" | "b" | "v" | "t")[] | null;
+    arg_types: string[] | null;
+    default_arg_count: number;
+    arg_defaults: string | null;
+    arg_list: string;
+    identity_args: string;
+    return_type: string;
+    full_return_type: string;
+    returns_array: boolean;
+    returns_set: boolean;
+    return_dimensions: number;
+    typelem: number;
+  }>(query, [pgType.schemaName, pgType.name]);
 
   const functions = Promise.all(
     rows.map(async (row) => {
@@ -163,7 +164,7 @@ async function extractFunction(
       const argModes =
         row.arg_modes?.map((mode) => parameterModeMap[mode]) ?? [];
       const canonical_arg_types = row.arg_types
-        ? await canonicaliseTypes(db, row.arg_types)
+        ? await canonicaliseTypes(pg, row.arg_types)
         : [];
 
       const firstOutParamIndex =
@@ -181,7 +182,7 @@ async function extractFunction(
         });
 
         const column_types = await canonicaliseTypes(
-          db,
+          pg,
           columnDefs.map((col) => col.type),
         );
 
@@ -196,7 +197,7 @@ async function extractFunction(
       } else {
         returnType = {
           kind: FunctionReturnTypeKind.Regular,
-          type: (await canonicaliseTypes(db, [row.return_type]))[0],
+          type: (await canonicaliseTypes(pg, [row.return_type]))[0],
           isSet: row.returns_set,
         };
       }

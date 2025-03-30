@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type PgType from "./PgType.ts";
 
@@ -13,10 +13,13 @@ export interface RangeDetails extends PgType<"range"> {
 }
 
 const extractRange = async (
-  db: Knex,
+  pg: Client,
   range: PgType<"range">,
 ): Promise<RangeDetails> => {
-  const query = await db.raw(
+  const query = await pg.query<
+    { innerType: string },
+    [name: string, schemaName: string]
+  >(
     `
     SELECT
       subtype.typnamespace::regnamespace::text||'.'||subtype.typname as "innerType"
@@ -26,10 +29,10 @@ const extractRange = async (
       JOIN pg_range ON range_type.oid = pg_range.rngtypid
       JOIN pg_type subtype ON pg_range.rngsubtype = subtype.oid
     WHERE
-      pg_namespace.nspname = :schema_name
-      AND range_type.typname = :type_name
+      pg_namespace.nspname = $2
+      AND range_type.typname = $1
     `,
-    { type_name: range.name, schema_name: range.schemaName },
+    [range.name, range.schemaName],
   );
 
   return {

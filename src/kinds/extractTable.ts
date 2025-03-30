@@ -1,4 +1,4 @@
-import type { Knex } from "knex";
+import { Client } from "pg";
 
 import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
 import type InformationSchemaTable from "../information_schema/InformationSchemaTable.ts";
@@ -300,18 +300,38 @@ const referenceMapQueryPart = `
 `;
 
 const extractTable = async (
-  db: Knex,
+  pg: Client,
   table: PgType<"table">,
 ): Promise<TableDetails> => {
-  const [informationSchemaValue] = await db
-    .from("information_schema.tables")
-    .where({
-      table_name: table.name,
-      table_schema: table.schemaName,
-    })
-    .select<InformationSchemaTable[]>("*");
+  const [informationSchemaValue] = (
+    await pg.query<InformationSchemaTable, [name: string, schemaName: string]>(
+      `
+    SELECT * FROM information_schema.tables
+    WHERE
+      table_name = $1
+      AND table_schema = $2
+    `,
+      [table.name, table.schemaName],
+    )
+  ).rows;
 
-  const columnsQuery = await db.raw(
+  const columnsQuery = await pg.query<
+    {
+      name: string;
+      expandedType: string;
+      comment: string | null;
+      defaultValue: any;
+      isNullable: boolean;
+      isIdentity: boolean;
+      isUpdatable: boolean;
+      ordinalPosition: number;
+      generated: "ALWAYS" | "NEVER" | "BY DEFAULT";
+      isPrimaryKey: boolean;
+      references: ColumnReference[];
+      informationSchemaValue: InformationSchemaColumn;
+    },
+    [name: string, schemaName: string]
+  >(
     `
     WITH 
     reference_map AS (
@@ -346,17 +366,17 @@ const extractTable = async (
       LEFT JOIN reference_map ON reference_map.column_name = columns.column_name
       LEFT JOIN comment_map ON comment_map.column_name = columns.column_name
     WHERE
-      table_name = :table_name
-      AND table_schema = :schema_name;
+      table_name = $1
+      AND table_schema = $2;
   `,
-    { table_name: table.name, schema_name: table.schemaName },
+    [table.name, table.schemaName],
   );
 
   // Get the expanded type names from the query result
-  const expandedTypes = columnsQuery.rows.map((row: any) => row.expandedType);
+  const expandedTypes = columnsQuery.rows.map((row) => row.expandedType);
 
   // Use canonicaliseTypes to get detailed type information
-  const canonicalTypes = await canonicaliseTypes(db, expandedTypes);
+  const canonicalTypes = await canonicaliseTypes(pg, expandedTypes);
 
   // Combine the column information with the canonical type information
   const columns = columnsQuery.rows.map((row: any, index: number) => ({
@@ -374,7 +394,10 @@ const extractTable = async (
     informationSchemaValue: row.informationSchemaValue,
   }));
 
-  const indicesQuery = await db.raw(
+  const indicesQuery = await pg.query<
+    TableIndex,
+    [name: string, schemaName: string]
+  >(
     `
     WITH index_columns AS (
       SELECT
@@ -401,15 +424,22 @@ const extractTable = async (
       INNER JOIN pg_namespace n ON t.relnamespace = n.oid
       INNER JOIN index_columns ON ix.indexrelid = index_columns.indexrelid
     WHERE
-      t.relname = :table_name
-      AND n.nspname = :schema_name
+      t.relname = $1
+      AND n.nspname = $2
     `,
-    { table_name: table.name, schema_name: table.schemaName },
+    [table.name, table.schemaName],
   );
 
   const indices = indicesQuery.rows as TableIndex[];
 
-  const checkQuery = await db.raw(
+  const checkQuery = await pg.query<
+    {
+      schema: string;
+      table: string;
+      checks: TableCheck[];
+    },
+    [name: string, schemaName: string]
+  >(
     `
     SELECT
       source_namespace.nspname as "schema",
@@ -430,11 +460,11 @@ const extractTable = async (
      AND con.contype = 'c'
     GROUP BY source_namespace.nspname, source_class.relname;
   `,
-    { table_name: table.name, schema_name: table.schemaName },
+    [table.name, table.schemaName],
   );
 
   const checks = checkQuery.rows
-    .flatMap((row: any) => row.checks as TableCheck)
+    .flatMap((row) => row.checks)
     .map(({ name, clause }: TableCheck) => {
       const numberOfBrackets =
         clause.startsWith("((") && clause.endsWith("))") ? 2 : 1;
@@ -447,7 +477,14 @@ const extractTable = async (
       };
     });
 
-  const rlsQuery = await db.raw(
+  const rlsQuery = await pg.query<
+    {
+      isRowLevelSecurityEnabled: boolean;
+      isRowLevelSecurityEnforced: boolean;
+      securityPolicies: TableSecurityPolicy[];
+    },
+    [name: string, schemaName: string]
+  >(
     `
     SELECT
       c.relrowsecurity AS "isRowLevelSecurityEnabled",
@@ -469,7 +506,7 @@ const extractTable = async (
       AND n.nspname = :schema_name
     GROUP BY c.relrowsecurity, c.relforcerowsecurity
     `,
-    { table_name: table.name, schema_name: table.schemaName },
+    [table.name, table.schemaName],
   );
 
   const rls = rlsQuery.rows[0] as {
