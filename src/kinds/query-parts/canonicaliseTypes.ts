@@ -1,4 +1,4 @@
-import { Client } from "pg";
+import { DbAdapter } from "../../adapter.ts";
 
 export namespace CanonicalType {
 	export enum TypeKind {
@@ -82,7 +82,7 @@ export type CanonicalType =
 	| CanonicalType.Pseudo;
 
 export const canonicaliseTypes = async (
-	pg: Client,
+	db: DbAdapter,
 	types: string[],
 ): Promise<CanonicalType[]> => {
 	if (types.length === 0) return [];
@@ -293,14 +293,14 @@ export const canonicaliseTypes = async (
 			  });
 	}
 
-	const resolved = (await pg.query(query, types)).rows as Resolved[];
+	const resolved = await db.query<Resolved, string[]>(query, types);
 	return Promise.all(
 		resolved
 			.map(each => each.type_info)
 			.map(async each => {
 				if (each.kind === CanonicalType.TypeKind.Composite) {
 					const types = each.attributes.map(each => each.type_name);
-					const canonical = await canonicaliseTypes(pg, types);
+					const canonical = await canonicaliseTypes(db, types);
 
 					const attributes: CanonicalType.CompositeAttribute[] =
 						await Promise.all(

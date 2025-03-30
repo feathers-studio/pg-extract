@@ -174,7 +174,7 @@ export class Extractor {
 	}
 
 	async canonicaliseTypes(types: string[]) {
-		return canonicaliseTypes(this.pg, types);
+		return canonicaliseTypes(this.db, types);
 	}
 
 	async getBuiltinTypes(): Promise<
@@ -188,22 +188,22 @@ export class Extractor {
 		const db = this.db;
 
 		const query = `
-      SELECT t.typname AS name,
-            pg_catalog.format_type(t.oid, NULL) AS format,
-            CASE t.typtype
-                WHEN 'b' THEN 'base'
-                WHEN 'c' THEN 'composite'
-                WHEN 'd' THEN 'domain'
-                WHEN 'e' THEN 'enum'
-                WHEN 'p' THEN 'pseudo'
-                WHEN 'r' THEN 'range'
-                ELSE 'unknown'
-            END AS kind
-      FROM pg_catalog.pg_type t
-      WHERE t.typnamespace = 
-            (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')
-      ORDER BY name;
-    `;
+			SELECT t.typname AS name,
+				pg_catalog.format_type(t.oid, NULL) AS format,
+				CASE t.typtype
+					WHEN 'b' THEN 'base'
+					WHEN 'c' THEN 'composite'
+					WHEN 'd' THEN 'domain'
+					WHEN 'e' THEN 'enum'
+					WHEN 'p' THEN 'pseudo'
+					WHEN 'r' THEN 'range'
+					ELSE 'unknown'
+				END AS kind
+			FROM pg_catalog.pg_type t
+			WHERE t.typnamespace = 
+				(SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')
+			ORDER BY name;
+		`;
 
 		const result = await db.query<{
 			name: string;
@@ -228,10 +228,10 @@ export class Extractor {
 		const db = this.db;
 
 		const q = await db.query<{ nspname: string }>(`
-      SELECT nspname FROM pg_catalog.pg_namespace
-      WHERE nspname != 'information_schema'
-      AND nspname NOT LIKE 'pg_%'
-    `);
+			SELECT nspname FROM pg_catalog.pg_namespace
+			WHERE nspname != 'information_schema'
+			AND nspname NOT LIKE 'pg_%'
+		`);
 
 		const allSchemaNames = q.map(r => r.nspname);
 
@@ -259,7 +259,7 @@ export class Extractor {
 				typesToExtract.map(async pgType => {
 					const result = await (
 						populatorMap[pgType.kind] as Populator<typeof pgType.kind>
-					)(pg, pgType);
+					)(db, pgType);
 					options?.onProgress?.();
 					return result;
 				}),

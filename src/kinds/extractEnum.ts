@@ -1,4 +1,4 @@
-import { Client } from "pg";
+import { DbAdapter } from "../adapter.ts";
 
 import type PgType from "./PgType.ts";
 
@@ -6,21 +6,21 @@ import type PgType from "./PgType.ts";
  * Enum type in a schema.
  */
 export interface EnumDetails extends PgType<"enum"> {
-  /**
-   * Array of enum values in order.
-   */
-  values: string[];
+	/**
+	 * Array of enum values in order.
+	 */
+	values: string[];
 }
 
 const extractEnum = async (
-  pg: Client,
-  pgEnum: PgType<"enum">,
+	db: DbAdapter,
+	pgEnum: PgType<"enum">,
 ): Promise<EnumDetails> => {
-  const query = await pg.query<
-    { values: string[] },
-    [name: string, schemaName: string]
-  >(
-    `
+	const results = await db.query<
+		{ values: string[] },
+		[name: string, schemaName: string]
+	>(
+		`
     SELECT
       json_agg(pg_enum.enumlabel ORDER BY pg_enum.enumsortorder) as "values"
     FROM
@@ -32,13 +32,13 @@ const extractEnum = async (
       AND pg_namespace.nspname = $2
       AND typname = $1
     `,
-    [pgEnum.name, pgEnum.schemaName],
-  );
+		[pgEnum.name, pgEnum.schemaName],
+	);
 
-  return {
-    ...pgEnum,
-    ...query.rows[0],
-  };
+	return {
+		...pgEnum,
+		...results[0],
+	};
 };
 
 export default extractEnum;
