@@ -45,19 +45,25 @@ describe("fetchTypes", () => {
 		// );
 
 		const types = await fetchTypes(db, ["test"]);
-		expect(types.map(t => [t.name, t.kind])).toEqual([
-			["some_function", "function"],
-			["some_materialized_view", "materializedView"],
-			["some_table", "table"],
-			["some_procedure", "procedure"],
-			["some_domain", "domain"],
-			["some_composite_type", "composite"],
-			["some_range", "range"],
-			["some_view", "view"],
-			["some_enum", "enum"],
-			// ['some_multirange', 'multiRange'],
-			// ['some_aggregate', 'aggregate'],
-		]);
+		expect(
+			Object.fromEntries(
+				types.map(t => [t.name, t.kind] satisfies [string, string]),
+			),
+		).toEqual(
+			Object.fromEntries([
+				["some_function", "function"],
+				["some_materialized_view", "materializedView"],
+				["some_table", "table"],
+				["some_procedure", "procedure"],
+				["some_domain", "domain"],
+				["some_composite_type", "composite"],
+				["some_range", "range"],
+				["some_view", "view"],
+				["some_enum", "enum"],
+				// ['some_multirange', 'multiRange'],
+				// ['some_aggregate', 'aggregate'],
+			] satisfies [string, string][]),
+		);
 	});
 
 	it("should fetch comments", async () => {
@@ -80,10 +86,16 @@ describe("fetchTypes", () => {
 		);
 
 		const types = await fetchTypes(db, ["test"]);
-		expect(types.map(t => [t.name, t.comment])).toEqual([
-			["some_domain", "some domain comment"],
-			["some_table", "some table comment"],
-			["some_composite_type", "some composite type comment"],
-		]);
+		expect(
+			Object.fromEntries(
+				types.map(t => [t.name, t.comment] satisfies [string, string | null]),
+			),
+		).toEqual(
+			Object.fromEntries([
+				["some_domain", "some domain comment"],
+				["some_table", "some table comment"],
+				["some_composite_type", "some composite type comment"],
+			] satisfies [string, string | null][]),
+		);
 	});
 });
