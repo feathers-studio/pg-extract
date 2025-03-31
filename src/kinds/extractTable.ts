@@ -285,8 +285,8 @@ const referenceMapQueryPart = `
 					JOIN pg_class target_class ON confrelid = target_class.oid
 					JOIN pg_namespace target_namespace ON target_class.relnamespace = target_namespace.oid
 				WHERE
-					source_class.relname = :table_name
-					AND source_namespace.nspname = :schema_name
+					source_class.relname = $1
+					AND source_namespace.nspname = $2
 					AND contype = 'f') expanded_constraint
 				JOIN pg_attribute target_attr ON target_attr.attrelid = expanded_constraint.confrelid
 					AND target_attr.attnum = expanded_constraint.target_attnum
@@ -368,16 +368,27 @@ const extractTable = async (
 			LEFT JOIN comment_map ON comment_map.column_name = columns.column_name
 		WHERE
 			table_name = $1
-			AND table_schema = $2;
+			AND table_schema = $2
+		ORDER BY ordinal_position;
 	`,
 		[table.name, table.schemaName],
 	);
 
+	console.log(
+		"Column Names:",
+		columnsQuery.map(row => row.name),
+	);
+
 	// Get the expanded type names from the query result
 	const expandedTypes = columnsQuery.map(row => row.expandedType);
+	console.log("Expanded Types:", expandedTypes);
 
 	// Use canonicaliseTypes to get detailed type information
 	const canonicalTypes = await canonicaliseTypes(db, expandedTypes);
+	console.log(
+		"Canonical Types:",
+		canonicalTypes.map(t => t.canonical_name),
+	);
 
 	// Combine the column information with the canonical type information
 	const columns = columnsQuery.map((row: any, index: number) => ({
@@ -454,8 +465,8 @@ const extractTable = async (
 		 pg_class source_class,
 		 pg_namespace source_namespace 
 		WHERE
-		 source_class.relname = :table_name
-		 AND source_namespace.nspname = :schema_name
+		 source_class.relname = $1
+		 AND source_namespace.nspname = $2
 		 AND conrelid = source_class.oid 
 		 AND source_class.relnamespace = source_namespace.oid 
 		 AND con.contype = 'c'
@@ -503,8 +514,8 @@ const extractTable = async (
 			INNER JOIN pg_namespace n ON c.relnamespace = n.oid
 			LEFT JOIN pg_policies p ON c.relname = p.tablename AND n.nspname = p.schemaname
 		WHERE
-			c.relname = :table_name
-			AND n.nspname = :schema_name
+			c.relname = $1
+			AND n.nspname = $2
 		GROUP BY c.relrowsecurity, c.relforcerowsecurity
 		`,
 		[table.name, table.schemaName],

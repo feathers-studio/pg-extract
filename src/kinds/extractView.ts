@@ -172,8 +172,8 @@ join pg_attribute on pg_attribute.atttypid = t.oid
 join pg_class on pg_attribute.attrelid = pg_class.oid
 join pg_namespace on pg_class.relnamespace = pg_namespace.oid
 WHERE
-	pg_namespace.nspname = :schema_name
-	and pg_class.relname = :table_name
+	pg_namespace.nspname = $2
+	and pg_class.relname = $1
 `;
 
 const resolveSource = (

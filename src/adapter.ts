@@ -4,7 +4,7 @@ import { PGlite as Pglite } from "@electric-sql/pglite";
 class DbAdapter {
 	constructor(private client: Pg | Pglite) {}
 
-	connect() {
+	async connect() {
 		if (this.client instanceof Pg) {
 			return this.client.connect();
 		} else if (this.client instanceof Pglite) {
@@ -16,9 +16,24 @@ class DbAdapter {
 	 * Execute a read query and return just the rows
 	 */
 	async query<R, I extends any[] = []>(text: string, params?: I) {
-		// @ts-expect-error The two clients can process our query types similarly
-		const result = await this.client.query(text, params);
-		return result.rows as R[];
+		let stack;
+		try {
+			stack = new Error().stack;
+			stack = stack?.split("\n").slice(3).join("\n");
+			// @ts-expect-error The two clients can process our query types similarly
+			const result = await this.client.query(text, params);
+			return result.rows as R[];
+		} catch (error) {
+			if (error instanceof Error) {
+				console.error("Query Error ===");
+				console.error("Query:", text);
+				console.error("Parameters:", params);
+				console.error("\nStack trace:");
+				console.error(stack);
+				console.error("\nError details:", error.message);
+				process.exit(1);
+			} else throw error;
+		}
 	}
 
 	/**
