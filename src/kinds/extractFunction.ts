@@ -213,10 +213,10 @@ async function extractFunction(
 					.map(item => item.index) ?? [];
 
 			const parameters =
-				row.arg_names?.map((name, i): FunctionParameter => {
-					const isInputParam = INPUT_MODES.includes(row.arg_modes?.[i]!);
+				row.arg_types?.map((_, i): FunctionParameter => {
+					const name = row.arg_names?.[i] ?? `$${i + 1}`;
+					const isInputParam = INPUT_MODES.includes(row.arg_modes?.[i] ?? "i");
 					const inputParamIndex = inputParams.indexOf(i);
-					// Only input parameters can have defaults, and defaults are assigned to the rightmost arguments
 					const hasDefault =
 						isInputParam &&
 						inputParamIndex >=
@@ -225,7 +225,7 @@ async function extractFunction(
 					return {
 						name,
 						type: canonical_arg_types[i]!,
-						mode: argModes[i]!,
+						mode: argModes[i] ?? "IN",
 						hasDefault,
 						ordinalPosition: i + 1,
 					};
