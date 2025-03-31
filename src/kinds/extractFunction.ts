@@ -1,7 +1,7 @@
 import type { DbAdapter } from "../adapter.ts";
 
-import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine.ts";
-import type PgType from "./PgType.ts";
+import type { InformationSchemaRoutine } from "../information_schema/InformationSchemaRoutine.ts";
+import type { PgType } from "./PgType.ts";
 import {
 	canonicaliseTypes,
 	CanonicalType as CanonicalType,
@@ -179,28 +179,28 @@ async function extractFunction(
 				/TABLE\((.*)\)/i,
 			);
 			if (tableMatch) {
-				const columnDefs = tableMatch[1].split(",").map(col => {
+				const columnDefs = tableMatch[1]!.split(",").map(col => {
 					const [name, type] = col.trim().split(/\s+/);
 					return { name, type };
 				});
 
 				const column_types = await canonicaliseTypes(
 					db,
-					columnDefs.map(col => col.type),
+					columnDefs.map(col => col.type!),
 				);
 
 				returnType = {
 					kind: FunctionReturnTypeKind.Table,
 					columns: columnDefs.map((col, i) => ({
-						name: col.name,
-						type: column_types[i],
+						name: col.name!,
+						type: column_types[i]!,
 					})),
 					isSet: row.returns_set,
 				};
 			} else {
 				returnType = {
 					kind: FunctionReturnTypeKind.Regular,
-					type: (await canonicaliseTypes(db, [row.return_type]))[0],
+					type: (await canonicaliseTypes(db, [row.return_type]))[0]!,
 					isSet: row.returns_set,
 				};
 			}
@@ -224,8 +224,8 @@ async function extractFunction(
 
 					return {
 						name,
-						type: canonical_arg_types[i],
-						mode: argModes[i],
+						type: canonical_arg_types[i]!,
+						mode: argModes[i]!,
 						hasDefault,
 						ordinalPosition: i + 1,
 					};
@@ -247,7 +247,7 @@ async function extractFunction(
 				volatility: volatilityMap[row.volatility],
 				parallelSafety: parallelSafetyMap[row.parallel_safety],
 				returnType,
-				informationSchemaValue: informationSchemaValue,
+				informationSchemaValue: informationSchemaValue!,
 			};
 
 			return func;

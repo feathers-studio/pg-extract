@@ -1,7 +1,7 @@
 import type { DbAdapter } from "../adapter.ts";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
-import type PgType from "./PgType.ts";
+import type { InformationSchemaColumn } from "../information_schema/InformationSchemaColumn.ts";
+import type { PgType } from "./PgType.ts";
 import {
 	CanonicalType,
 	canonicaliseTypes,

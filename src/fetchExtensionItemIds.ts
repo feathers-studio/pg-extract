@@ -4,7 +4,6 @@ import { DbAdapter } from "./adapter.ts";
  * In order to ignore the items (types, views, etc.) that belong to extensions,
  * we use these queries to figure out what the OID's of those are. We can then
  * ignore them in fetchClasses.
- * @param db Knex instance
  * @returns the oids of the Postgres extension classes and types
  */
 const fetchExtensionItemIds = async (

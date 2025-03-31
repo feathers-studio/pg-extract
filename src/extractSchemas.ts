@@ -1,4 +1,4 @@
-import { Client as Pg, ConnectionConfig } from "pg";
+import { Client as Pg, type ConnectionConfig } from "pg";
 import { PGlite as Pglite } from "@electric-sql/pglite";
 import { DbAdapter } from "./adapter.ts";
 
@@ -23,8 +23,7 @@ import extractTable from "./kinds/extractTable.ts";
 import type { ViewDetails } from "./kinds/extractView.ts";
 import extractView from "./kinds/extractView.ts";
 import fetchTypes from "./kinds/fetchTypes.ts";
-import type { Kind } from "./kinds/PgType.ts";
-import type PgType from "./kinds/PgType.ts";
+import type { Kind, PgType } from "./kinds/PgType.ts";
 import resolveViewColumns from "./resolveViewColumns.ts";
 import {
 	canonicaliseTypes,
@@ -274,8 +273,8 @@ export class Extractor {
 					...emptySchema,
 				};
 			}
-			(schemas[p.schemaName][`${p.kind}s`] as DetailsMap[typeof p.kind][]) = [
-				...schemas[p.schemaName][`${p.kind}s`],
+			(schemas[p.schemaName]![`${p.kind}s`] as DetailsMap[typeof p.kind][]) = [
+				...schemas[p.schemaName]![`${p.kind}s`],
 				p,
 			];
 		}

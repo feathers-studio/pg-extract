@@ -1,6 +1,6 @@
 import { DbAdapter } from "../adapter.ts";
 
-import type PgType from "./PgType.ts";
+import type { PgType } from "./PgType.ts";
 
 /**
  * Enum type in a schema.
@@ -37,7 +37,7 @@ const extractEnum = async (
 
 	return {
 		...pgEnum,
-		...results[0],
+		...results[0]!,
 	};
 };
 

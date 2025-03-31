@@ -1,7 +1,7 @@
 import { DbAdapter } from "../adapter.ts";
 
 import fetchExtensionItemIds from "../fetchExtensionItemIds.ts";
-import type PgType from "./PgType.ts";
+import type { PgType } from "./PgType.ts";
 import { classKindMap, typeKindMap } from "./PgType.ts";
 
 const fetchTypes = async (

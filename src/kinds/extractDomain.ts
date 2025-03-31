@@ -1,7 +1,7 @@
 import { DbAdapter } from "../adapter.ts";
 
-import type InformationSchemaDomain from "../information_schema/InformationSchemaDomain.ts";
-import type PgType from "./PgType.ts";
+import type { InformationSchemaDomain } from "../information_schema/InformationSchemaDomain.ts";
+import type { PgType } from "./PgType.ts";
 
 /**
  * Domain type in a schema.
@@ -49,7 +49,7 @@ const extractDomain = async (
 
 	return {
 		...domain,
-		...results[0],
+		...results[0]!,
 	};
 };
 

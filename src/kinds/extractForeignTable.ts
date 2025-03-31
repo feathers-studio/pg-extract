@@ -1,8 +1,8 @@
 import { DbAdapter } from "../adapter.ts";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
-import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
-import type PgType from "./PgType.ts";
+import type { InformationSchemaColumn } from "../information_schema/InformationSchemaColumn.ts";
+import type { InformationSchemaView } from "../information_schema/InformationSchemaView.ts";
+import type { PgType } from "./PgType.ts";
 import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
 
 /**
@@ -196,7 +196,7 @@ const extractForeignTable = async (
 
 	return {
 		...foreignTable,
-		informationSchemaValue,
+		informationSchemaValue: informationSchemaValue!,
 		columns,
 	};
 };

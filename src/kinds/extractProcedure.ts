@@ -1,8 +1,8 @@
 import type { DbAdapter } from "../adapter.ts";
 
-import type InformationSchemaRoutine from "../information_schema/InformationSchemaRoutine.ts";
+import type { InformationSchemaRoutine } from "../information_schema/InformationSchemaRoutine.ts";
 import { parsePostgresArray } from "./parsePostgresArray.ts";
-import type PgType from "./PgType.ts";
+import type { PgType } from "./PgType.ts";
 
 // Reuse these from extractFunction.ts
 const parameterModeMap = {
@@ -90,23 +90,23 @@ async function extractProcedure(
 		[pgType.schemaName, pgType.name],
 	);
 
-	const row = rows[0];
-	const argTypes = (row.arg_types ? row.arg_types.split(",") : []) as string[];
+	const row = rows[0]!;
+	const argTypes = (row?.arg_types ? row.arg_types.split(",") : []) as string[];
 
-	const paramModes = row.proargmodes
+	const paramModes = row?.proargmodes
 		? parsePostgresArray(String(row.proargmodes))
 		: argTypes.map(() => "i");
 
-	const paramNames = row.proargnames
+	const paramNames = row?.proargnames
 		? parsePostgresArray(String(row.proargnames))
 		: argTypes.map((_, i) => `$${i + 1}`);
 
 	const parameters: ProcedureParameter[] = argTypes.map(
 		(type: string, i: number) => ({
-			name: paramNames[i],
+			name: paramNames[i]!,
 			type: type,
 			mode: parameterModeMap[paramModes[i] as keyof typeof parameterModeMap],
-			hasDefault: i >= argTypes.length - (row.pronargdefaults || 0),
+			hasDefault: i >= argTypes.length - (row?.pronargdefaults || 0),
 			ordinalPosition: i + 1,
 		}),
 	);
@@ -136,7 +136,7 @@ async function extractProcedure(
 		] as FunctionParallelSafety,
 		estimatedCost: row.estimated_cost,
 		comment: row.comment,
-		informationSchemaValue,
+		informationSchemaValue: informationSchemaValue!,
 	};
 }
 

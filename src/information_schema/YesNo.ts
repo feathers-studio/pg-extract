@@ -1,3 +1,1 @@
-type YesNo = "YES" | "NO";
-
-export default YesNo;
+export type YesNo = "YES" | "NO";

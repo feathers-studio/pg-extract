@@ -1,12 +1,12 @@
 import { DbAdapter } from "../adapter.ts";
 import * as R from "ramda";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
-import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
+import type { InformationSchemaColumn } from "../information_schema/InformationSchemaColumn.ts";
+import type { InformationSchemaView } from "../information_schema/InformationSchemaView.ts";
 import type { ColumnReference, Index } from "./extractTable.ts";
 import type { ViewReference } from "./parseViewDefinition.ts";
 import parseViewDefinition from "./parseViewDefinition.ts";
-import type PgType from "./PgType.ts";
+import type { PgType } from "./PgType.ts";
 import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
 
 /**
@@ -277,7 +277,7 @@ const extractView = async (
 	let sourceMapping: Record<string, ViewReference> | undefined;
 	try {
 		const viewReferences = await parseViewDefinition(
-			informationSchemaValue.view_definition,
+			informationSchemaValue!.view_definition,
 			view.schemaName,
 		);
 		sourceMapping = R.indexBy(R.prop("viewColumn"), viewReferences);
@@ -293,16 +293,16 @@ const extractView = async (
 
 	return {
 		...view,
-		definition: informationSchemaValue.view_definition,
-		informationSchemaValue,
+		definition: informationSchemaValue!.view_definition,
+		informationSchemaValue: informationSchemaValue!,
 		columns,
 		options: {
-			checkOption: viewOptionsQuery[0].check_option as
+			checkOption: viewOptionsQuery[0]!.check_option as
 				| "local"
 				| "cascaded"
 				| null,
-			securityBarrier: viewOptionsQuery[0].security_barrier,
-			securityInvoker: viewOptionsQuery[0].security_invoker,
+			securityBarrier: viewOptionsQuery[0]!.security_barrier,
+			securityInvoker: viewOptionsQuery[0]!.security_invoker,
 		},
 	};
 };

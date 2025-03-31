@@ -313,7 +313,7 @@ export const canonicaliseTypes = async (
 								return {
 									name: each.name,
 									index: each.index,
-									type: canonical[index],
+									type: canonical[index]!,
 									comment: each.comment,
 									defaultValue: each.defaultValue,
 									isNullable: each.isNullable,

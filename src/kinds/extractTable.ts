@@ -1,8 +1,8 @@
 import { DbAdapter } from "../adapter.ts";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
-import type InformationSchemaTable from "../information_schema/InformationSchemaTable.ts";
-import type PgType from "./PgType.ts";
+import type { InformationSchemaColumn } from "../information_schema/InformationSchemaColumn.ts";
+import type { InformationSchemaTable } from "../information_schema/InformationSchemaTable.ts";
+import type { PgType } from "./PgType.ts";
 import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
 import indexMapQueryPart from "./query-parts/indexMapQueryPart.ts";
 import {
@@ -374,26 +374,16 @@ const extractTable = async (
 		[table.name, table.schemaName],
 	);
 
-	console.log(
-		"Column Names:",
-		columnsQuery.map(row => row.name),
-	);
-
 	// Get the expanded type names from the query result
 	const expandedTypes = columnsQuery.map(row => row.expandedType);
-	console.log("Expanded Types:", expandedTypes);
 
 	// Use canonicaliseTypes to get detailed type information
 	const canonicalTypes = await canonicaliseTypes(db, expandedTypes);
-	console.log(
-		"Canonical Types:",
-		canonicalTypes.map(t => t.canonical_name),
-	);
 
 	// Combine the column information with the canonical type information
 	const columns = columnsQuery.map((row: any, index: number) => ({
 		name: row.name,
-		type: canonicalTypes[index],
+		type: canonicalTypes[index]!,
 		comment: row.comment,
 		defaultValue: row.defaultValue,
 		isPrimaryKey: row.isPrimaryKey,
@@ -531,7 +521,7 @@ const extractTable = async (
 		...table,
 		indices,
 		checks,
-		informationSchemaValue,
+		informationSchemaValue: informationSchemaValue!,
 		columns,
 		...rls,
 	};

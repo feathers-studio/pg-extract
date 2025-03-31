@@ -1,9 +1,9 @@
 import type { DbAdapter } from "../adapter.ts";
 
-import type InformationSchemaColumn from "../information_schema/InformationSchemaColumn.ts";
-import type InformationSchemaView from "../information_schema/InformationSchemaView.ts";
+import type { InformationSchemaColumn } from "../information_schema/InformationSchemaColumn.ts";
+import type { InformationSchemaView } from "../information_schema/InformationSchemaView.ts";
 import type { ColumnReference, Index } from "./extractTable.ts";
-import type PgType from "./PgType.ts";
+import type { PgType } from "./PgType.ts";
 import commentMapQueryPart from "./query-parts/commentMapQueryPart.ts";
 import fakeInformationSchemaColumnsQueryPart from "./query-parts/fakeInformationSchemaColumnsQueryPart.ts";
 import fakeInformationSchemaViewsQueryPart from "./query-parts/fakeInformationSchemaViewsQueryPart.ts";
@@ -227,9 +227,9 @@ const extractMaterializedView = async (
 
 	return {
 		...materializedView,
-		definition: fakeInformationSchemaValue.view_definition,
+		definition: fakeInformationSchemaValue!.view_definition,
 		columns,
-		fakeInformationSchemaValue,
+		fakeInformationSchemaValue: fakeInformationSchemaValue!,
 	};
 };
 
