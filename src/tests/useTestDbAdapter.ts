@@ -7,7 +7,8 @@ import { DbAdapter } from "../adapter.js";
 const useTestDbAdapter = (): readonly [() => DbAdapter, string] => {
 	let dbAdapter: DbAdapter;
 
-	const database = `test_${Math.ceil(Math.random() * 1000)}`;
+	// const database = `test_${Math.ceil(Math.random() * 1000)}`;
+	const database = "template1";
 	const pglite = new PGlite("memory://", {
 		database,
 		extensions: { pg_trgm, citext },
@@ -19,9 +20,8 @@ const useTestDbAdapter = (): readonly [() => DbAdapter, string] => {
 	});
 
 	afterAll(async () => {
-		await dbAdapter.query(`drop database ${database} with (force)`);
 		await dbAdapter.close();
-		console.log("dropped database", database);
+		console.log("closed database", database);
 	});
 
 	return [() => dbAdapter, database] as const;
