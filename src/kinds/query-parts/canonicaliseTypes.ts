@@ -18,7 +18,7 @@ export namespace CanonicalType {
 		name: string;
 		kind: TypeKind;
 		dimensions: number;
-		modifiers?: string;
+		modifiers?: string | null;
 	}
 
 	export interface Base extends Abstract {
@@ -61,7 +61,7 @@ export namespace CanonicalType {
 			canonical_name: string;
 			schema: string;
 			name: string;
-		};
+		} | null;
 	}
 
 	export interface Range extends Abstract {

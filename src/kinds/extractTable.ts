@@ -346,7 +346,23 @@ const extractTable = async (
 		)
 		SELECT
 			columns.column_name AS "name",
-			format_type(columns.udt_name::regtype, columns.character_maximum_length) AS "expandedType",
+			format_type(
+				(CASE 
+					WHEN columns.udt_schema = 'pg_catalog' THEN columns.udt_name 
+					ELSE columns.udt_schema || '.' || columns.udt_name 
+				END)::regtype,
+				columns.character_maximum_length
+			) 
+			|| COALESCE(repeat('[]', (
+				-- Subtract 1 because the first dimension is already in the base type as []
+				SELECT GREATEST(a.attndims - 1, 0)
+				FROM pg_attribute a 
+				JOIN pg_class c ON c.oid = a.attrelid
+				JOIN pg_namespace n ON n.oid = c.relnamespace
+				WHERE c.relname = $1 
+				AND n.nspname = $2
+				AND a.attname = columns.column_name
+			)), '') AS "expandedType",
 			comment_map.comment AS "comment",
 			column_default AS "defaultValue", 
 			is_nullable = 'YES' AS "isNullable", 
@@ -363,6 +379,7 @@ const extractTable = async (
 			row_to_json(columns.*) AS "informationSchemaValue"
 		FROM
 			information_schema.columns
+			LEFT JOIN pg_type t ON columns.udt_name::regtype = t.oid
 			LEFT JOIN index_map ON index_map.column_name = columns.column_name
 			LEFT JOIN reference_map ON reference_map.column_name = columns.column_name
 			LEFT JOIN comment_map ON comment_map.column_name = columns.column_name

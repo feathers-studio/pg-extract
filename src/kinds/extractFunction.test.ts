@@ -157,7 +157,7 @@ describe("extractFunction", () => {
 					type: {
 						schema: "pg_catalog",
 						name: "text",
-						original_type: "pg_catalog.text",
+						original_type: "text",
 						canonical_name: "pg_catalog.text",
 						kind: CanonicalType.TypeKind.Base,
 						dimensions: 0,
@@ -202,44 +202,77 @@ describe("extractFunction", () => {
 
 		const result = await extractFunction(db, makePgType("param_modes"));
 
-		expect(result[0]!.parameters).toMatchObject([
-			{ name: "in_param", mode: "IN", type: "text" },
-			{ name: "out_param", mode: "OUT", type: "text" },
-			{ name: "inout_param", mode: "INOUT", type: "integer" },
-			{ name: "var_param", mode: "VARIADIC", type: "text[]" },
+		expect(
+			result[0]!.parameters.map(p => ({
+				name: p.name,
+				mode: p.mode,
+				type: p.type.canonical_name,
+				dimensions: p.type.dimensions,
+			})),
+		).toMatchObject([
+			{ name: "in_param", mode: "IN", type: "pg_catalog.text", dimensions: 0 },
+			{
+				name: "out_param",
+				mode: "OUT",
+				type: "pg_catalog.text",
+				dimensions: 0,
+			},
+			{
+				name: "inout_param",
+				mode: "INOUT",
+				type: "pg_catalog.int4",
+				dimensions: 0,
+			},
+			{
+				name: "var_param",
+				mode: "VARIADIC",
+				type: "pg_catalog.text",
+				dimensions: 1,
+			},
 		]);
 	});
 
 	it("should handle complex return types", async () => {
 		const db = getDbAdapter();
-		await db.query(`
-	  create type test.complex_type as (id int, name text);
 
-	  create function test.returns_complex()
-	  returns table(
-		id integer,
-		name text,
-		tags text[],
-		metadata json,
-		complex test.complex_type
-	  ) as $$
-	  BEGIN
-		-- Function body
-	  END;
-	  $$ language plpgsql`);
+		await db.query(`create type test.complex_type as (id int, name text);`);
+
+		await db.query(`
+			create function test.returns_complex()
+			returns table(
+				id integer,
+				name text,
+				tags text[],
+				metadata json,
+				complex test.complex_type
+			) as $$
+			BEGIN
+				-- Function body
+			END;
+			$$ language plpgsql
+		`);
 
 		const result = await extractFunction(db, makePgType("returns_complex"));
+		const returnType = result[0]!.returnType;
+		const columns =
+			returnType.kind === FunctionReturnTypeKind.Table
+				? returnType.columns
+				: [];
 
-		expect(result[0]!.returnType).toMatchObject({
-			type: "table",
-			columns: [
-				{ name: "id", type: "integer" },
-				{ name: "name", type: "text" },
-				{ name: "tags", type: "text[]" },
-				{ name: "metadata", type: "json" },
-				{ name: "complex", type: "test.complex_type" },
-			],
-		});
+		expect(returnType.kind).toBe(FunctionReturnTypeKind.Table);
+		expect(
+			columns.map(c => ({
+				name: c.name,
+				type: c.type.canonical_name,
+				dimensions: c.type.dimensions,
+			})),
+		).toMatchObject([
+			{ name: "id", type: "pg_catalog.int4", dimensions: 0 },
+			{ name: "name", type: "pg_catalog.text", dimensions: 0 },
+			{ name: "tags", type: "pg_catalog.text", dimensions: 1 },
+			{ name: "metadata", type: "pg_catalog.json", dimensions: 0 },
+			{ name: "complex", type: "test.complex_type", dimensions: 0 },
+		]);
 	});
 
 	it("should handle function attributes", async () => {

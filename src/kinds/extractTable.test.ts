@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import useSchema from "../tests/useSchema.ts";
 import type {
 	ColumnReference,
-	Index,
 	TableCheck,
 	TableDetails,
 	TableIndex,
@@ -62,7 +61,13 @@ describe("extractTable", () => {
 						schema: "pg_catalog",
 						name: "int4",
 						dimensions: 0,
-						original_type: "pg_catalog.int4",
+						original_type: "integer",
+						modifiers: null,
+						// @ts-expect-error union type issue
+						domain_base_type: null,
+						range_subtype: null,
+						enum_values: null,
+						attributes: null,
 					},
 					references: [],
 					defaultValue: null,
@@ -143,44 +148,42 @@ describe("extractTable", () => {
 	it("should handle arrays of primitive types", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create table test.some_table (array_of_ints integer[], array_of_strings text[], two_dimensional_array integer[][])",
+			"create table test.some_table (normal_int integer, array_of_ints integer[], array_of_strings text[], two_dimensional_array integer[][])",
 		);
 
 		const result = await extractTable(db, makePgType("some_table"));
 
 		const actual = result.columns.map(column => ({
 			name: column.name,
-			type: {
-				canonical_name: column.type.canonical_name,
-				kind: column.type.kind,
-				dimensions: column.type.dimensions,
-			},
+			canonical_name: column.type.canonical_name,
+			kind: column.type.kind,
+			dimensions: column.type.dimensions,
 		}));
 
 		const expected: typeof actual = [
 			{
+				name: "normal_int",
+				canonical_name: "pg_catalog.int4",
+				kind: CanonicalType.TypeKind.Base,
+				dimensions: 0,
+			},
+			{
 				name: "array_of_ints",
-				type: {
-					canonical_name: "pg_catalog.int4[]",
-					kind: CanonicalType.TypeKind.Base,
-					dimensions: 1,
-				},
+				canonical_name: "pg_catalog.int4",
+				kind: CanonicalType.TypeKind.Base,
+				dimensions: 1,
 			},
 			{
 				name: "array_of_strings",
-				type: {
-					canonical_name: "pg_catalog.text[]",
-					kind: CanonicalType.TypeKind.Base,
-					dimensions: 1,
-				},
+				canonical_name: "pg_catalog.text",
+				kind: CanonicalType.TypeKind.Base,
+				dimensions: 1,
 			},
 			{
 				name: "two_dimensional_array",
-				type: {
-					canonical_name: "pg_catalog.int4[][]",
-					kind: CanonicalType.TypeKind.Base,
-					dimensions: 2,
-				},
+				canonical_name: "pg_catalog.int4",
+				kind: CanonicalType.TypeKind.Base,
+				dimensions: 2,
 			},
 		];
 		expect(actual).toEqual(expected);
@@ -220,92 +223,88 @@ describe("extractTable", () => {
 
 		await db.query(
 			`create table test.some_table (
-		d test.some_domain,
-		c test.some_composite,
-		r test.some_range,
-		e test.some_enum,
-		d_a test.some_domain[],
-		c_a test.some_composite[],
-		r_a test.some_range[],
-		e_a test.some_enum[]
-	)`,
+				d test.some_domain,
+				c test.some_composite,
+				r test.some_range,
+				e test.some_enum,
+				d_a test.some_domain[],
+				c_a test.some_composite[],
+				r_a test.some_range[],
+				e_a test.some_enum[]
+			)`,
 		);
 
 		const result = await extractTable(db, makePgType("some_table"));
 
 		const actual = result.columns.map(column => ({
 			name: column.name,
-			type: {
-				canonical_name: column.type.canonical_name,
-				kind: column.type.kind,
-				dimensions: column.type.dimensions,
-			},
+			canonical_name: column.type.canonical_name,
+			kind: column.type.kind,
+			dimensions: column.type.dimensions,
+			// @ts-expect-error union type issue
+			domain_base_type: column.type.domain_base_type,
 		}));
 
 		const expected: typeof actual = [
 			{
 				name: "d",
-				type: {
-					canonical_name: "test.some_domain",
-					kind: CanonicalType.TypeKind.Domain,
-					dimensions: 0,
-				},
+				canonical_name: "test.some_domain",
+				kind: CanonicalType.TypeKind.Domain,
+				dimensions: 0,
+				domain_base_type: null,
 			},
 			{
 				name: "c",
-				type: {
-					canonical_name: "test.some_composite",
-					kind: CanonicalType.TypeKind.Composite,
-					dimensions: 0,
-				},
+				canonical_name: "test.some_composite",
+				kind: CanonicalType.TypeKind.Composite,
+				dimensions: 0,
+				domain_base_type: null,
 			},
 			{
 				name: "r",
-				type: {
-					canonical_name: "test.some_range",
-					kind: CanonicalType.TypeKind.Range,
-					dimensions: 0,
-				},
+				canonical_name: "test.some_range",
+				kind: CanonicalType.TypeKind.Range,
+				dimensions: 0,
+				domain_base_type: null,
 			},
 			{
 				name: "e",
-				type: {
-					canonical_name: "test.some_enum",
-					kind: CanonicalType.TypeKind.Enum,
-					dimensions: 0,
-				},
+				canonical_name: "test.some_enum",
+				kind: CanonicalType.TypeKind.Enum,
+				dimensions: 0,
+				domain_base_type: null,
 			},
 			{
 				name: "d_a",
-				type: {
-					canonical_name: "test.some_domain[]",
-					kind: CanonicalType.TypeKind.Base,
-					dimensions: 1,
+				canonical_name: "test.some_domain",
+				kind: CanonicalType.TypeKind.Domain,
+				dimensions: 1,
+				domain_base_type: {
+					canonical_name: "pg_catalog.text",
+					name: "text",
+					schema: "pg_catalog",
 				},
 			},
 			{
 				name: "c_a",
-				type: {
-					canonical_name: "test.some_composite[]",
-					kind: CanonicalType.TypeKind.Composite,
-					dimensions: 1,
-				},
+				canonical_name: "test.some_composite",
+				kind: CanonicalType.TypeKind.Composite,
+				dimensions: 1,
+				domain_base_type: null,
 			},
 			{
 				name: "r_a",
-				type: {
-					canonical_name: "test.some_range[]",
-					kind: CanonicalType.TypeKind.Base,
-					dimensions: 1,
-				},
+				canonical_name: "test.some_range",
+				kind: CanonicalType.TypeKind.Range,
+				dimensions: 1,
+				domain_base_type: null,
 			},
 			{
 				name: "e_a",
-				type: {
-					canonical_name: "test.some_enum[]",
-					kind: CanonicalType.TypeKind.Base,
-					dimensions: 1,
-				},
+				canonical_name: "test.some_enum",
+				kind: CanonicalType.TypeKind.Enum,
+				dimensions: 1,
+				domain_base_type: null,
 			},
 		];
 
@@ -636,9 +635,16 @@ describe("extractTable", () => {
 
 			const result = await extractTable(db, makePgType("some_table"));
 
-			const expected: Index[] = [
+			const expected: TableIndex[] = [
 				{
+					columns: [
+						{
+							definition: "id",
+							name: "id",
+						},
+					],
 					isPrimary: false,
+					isUnique: false,
 					name: "some_table_id_idx",
 				},
 			];

@@ -27,16 +27,16 @@ describe("extractMaterializedView", () => {
 	it("should extract simplified information", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create materialized view test.some_materialized_view as select 1 as id",
+			"create materialized view test.test_custom_matview as select 1 as id",
 		);
 
 		const result = await extractMaterializedView(
 			db,
-			makePgType("some_materialized_view"),
+			makePgType("test_custom_matview"),
 		);
 
 		const expected: MaterializedViewDetails = {
-			name: "some_materialized_view",
+			name: "test_custom_matview",
 			schemaName: "test",
 			kind: "materializedView",
 			comment: null,
@@ -61,7 +61,7 @@ describe("extractMaterializedView", () => {
 					fakeInformationSchemaValue: {
 						table_catalog: databaseName,
 						table_schema: "test",
-						table_name: "some_materialized_view",
+						table_name: "test_custom_matview",
 						column_name: "id",
 						ordinal_position: 1,
 						column_default: null,
@@ -109,7 +109,7 @@ describe("extractMaterializedView", () => {
 			fakeInformationSchemaValue: {
 				table_catalog: databaseName,
 				table_schema: "test",
-				table_name: "some_materialized_view",
+				table_name: "test_custom_matview",
 				view_definition: " SELECT 1 AS id;",
 				check_option: "NONE",
 				is_updatable: "NO",

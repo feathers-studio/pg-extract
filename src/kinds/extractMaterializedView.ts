@@ -170,16 +170,27 @@ const extractMaterializedView = async (
 	const fakeInformationSchemaValueQuery = await db.query<
 		InformationSchemaView,
 		[string, string]
-	>(fakeInformationSchemaViewsQueryPart);
+	>(
+		`WITH fake_info_schema_views AS (
+			${fakeInformationSchemaViewsQueryPart}
+		)
+		SELECT * FROM fake_info_schema_views
+		WHERE table_name = $1 AND table_schema = $2`,
+		[materializedView.name, materializedView.schemaName],
+	);
 	const fakeInformationSchemaValue = fakeInformationSchemaValueQuery[0];
 
-	// const [{ definition }] = await db
-	//   .select<{ definition: string }[]>('definition')
-	//   .from('pg_matviews')
-	//   .where({
-	//     matviewname: view.name,
-	//     schemaname: view.schemaName,
-	//   });
+	// Get the actual definition from pg_matviews
+	const [materializedViewDefinition] = await db.query<
+		{ definition: string },
+		[string, string]
+	>(
+		`SELECT definition FROM pg_matviews 
+		 WHERE matviewname = $1 AND schemaname = $2`,
+		[materializedView.name, materializedView.schemaName],
+	);
+
+	const definition = materializedViewDefinition?.definition!;
 
 	const columnsQuery = await db.query<MaterializedViewColumn, [string, string]>(
 		`
@@ -227,7 +238,7 @@ const extractMaterializedView = async (
 
 	return {
 		...materializedView,
-		definition: fakeInformationSchemaValue!.view_definition,
+		definition,
 		columns,
 		fakeInformationSchemaValue: fakeInformationSchemaValue!,
 	};
