@@ -1,4 +1,3 @@
-import * as R from "ramda";
 import { describe, expect, it } from "vitest";
 
 import useSchema from "../tests/useSchema.ts";
@@ -154,10 +153,12 @@ describe("extractView", () => {
 		);
 
 		const result = await extractView(db, makePgType("some_view"));
-		const actual = R.map(
-			R.pick(["name", "expandedType", "type", "isArray"]),
-			result.columns,
-		);
+		const actual = result.columns.map(column => ({
+			name: column.name,
+			expandedType: column.expandedType,
+			type: column.type,
+			isArray: column.isArray,
+		}));
 
 		const expected: Partial<ViewColumn>[] = [
 			{

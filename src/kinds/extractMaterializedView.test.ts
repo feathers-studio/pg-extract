@@ -1,4 +1,3 @@
-import * as R from "ramda";
 import { describe, expect, it } from "vitest";
 
 import useSchema from "../tests/useSchema.ts";
@@ -170,10 +169,13 @@ describe("extractMaterializedView", () => {
 			db,
 			makePgType("some_materialized_view"),
 		);
-		const actual = R.map(
-			R.pick(["name", "expandedType", "type", "isArray"]),
-			result.columns,
-		);
+
+		const actual = result.columns.map(column => ({
+			name: column.name,
+			expandedType: column.expandedType,
+			type: column.type,
+			isArray: column.isArray,
+		}));
 
 		const expected: Partial<MaterializedViewColumn>[] = [
 			{
