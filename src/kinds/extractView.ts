@@ -1,5 +1,4 @@
 import { DbAdapter } from "../adapter.ts";
-import * as R from "ramda";
 
 import type { InformationSchemaColumn } from "../information_schema/InformationSchemaColumn.ts";
 import type { InformationSchemaView } from "../information_schema/InformationSchemaView.ts";
@@ -280,7 +279,10 @@ const extractView = async (
 			informationSchemaValue!.view_definition,
 			view.schemaName,
 		);
-		sourceMapping = R.indexBy(R.prop("viewColumn"), viewReferences);
+		sourceMapping = viewReferences.reduce((acc, ref) => {
+			acc[ref.viewColumn] = ref;
+			return acc;
+		}, {} as Record<string, ViewReference>);
 	} catch {
 		console.warn(
 			`Error parsing view definition for "${view.name}". Falling back to raw data`,

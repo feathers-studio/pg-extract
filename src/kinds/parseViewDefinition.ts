@@ -1,6 +1,3 @@
-import jp from "jsonpath";
-import { last } from "ramda";
-
 let pgQueryInstance: any;
 const getPgQuery = async () => {
 	if (!pgQueryInstance) {
@@ -41,10 +38,15 @@ function parseSelectStmt(
 	selectAst.fromClause.forEach((fromClause: any) => {
 		const fromTable = fromClause.RangeVar;
 
-		const selectTargets = jp.query(selectAst, "$.targetList[*].ResTarget");
+		// @ts-expect-error selectAst is not typed, this might be wrong
+		// "$.targetList[*].ResTarget"
+		const selectTargets = selectAst.targetList.map(target => target.ResTarget);
 
 		selectTargets.forEach((selectTarget: any) => {
-			const fields = jp.query(selectTarget, "$.val[*].fields[*].String.sval");
+			// @ts-expect-error selectTarget is not typed, this might be wrong
+			// "$.val[*].fields[*].String.sval"
+			// prettier-ignore
+			const fields = selectTarget.val.map(v => v.fields.map(f => f.String.sval));
 			let sourceTable = fromTable?.relname;
 			let sourceSchema = fromTable?.schemaname;
 			if (fields.length === 2) {
@@ -56,17 +58,17 @@ function parseSelectStmt(
 					sourceTable = tableRel;
 				}
 			}
-			const sourceColumn = last(fields);
+			const sourceColumn = fields.at(-1);
 
 			const viewReference: ViewReference = {
-				viewColumn: selectTarget.name || last(fields),
+				viewColumn: selectTarget.name || fields.at(-1),
 				source:
 					sourceTable && sourceColumn
 						? {
 								schema: sourceSchema ?? defaultSchema,
 								table: sourceTable,
-								column: last(fields),
-							}
+								column: fields.at(-1),
+						  }
 						: undefined,
 			};
 			viewReferences.push(viewReference);
@@ -89,12 +91,18 @@ async function parseViewDefinition(
 		);
 	}
 
-	const aliasDefinitions = jp.query(
-		ast,
-		"$.stmt.SelectStmt.fromClause..[?(@.alias)]",
-	);
+	// Extract alias definitions from the AST
+	// "$.targetList[*].ResTarget" might be a wrong translation of JP:
+	const aliasDefinitions = ast.stmt.SelectStmt.fromClause
+		.filter((fromClause: any) => fromClause.RangeVar?.alias)
+		.map((fromClause: any) => ({
+			schemaname: fromClause.RangeVar.schemaname,
+			relname: fromClause.RangeVar.relname,
+			alias: fromClause.RangeVar.alias,
+		}));
 
 	const aliases = Object.fromEntries(
+		// @ts-expect-error aliasDefinitions is not typed, this might be wrong
 		aliasDefinitions.map(({ schemaname, relname, alias }) => [
 			alias.aliasname,
 			{ schema: schemaname, table: relname },
@@ -133,7 +141,7 @@ async function parseViewDefinition(
 			? (cteAliases[source.table]!.find(
 					cteViewReference =>
 						cteViewReference.viewColumn === viewReference.viewColumn,
-				) as ViewReference)
+			  ) as ViewReference)
 			: viewReference;
 	});
 
