@@ -20,11 +20,12 @@ import type { RangeDetails } from "./kinds/extractRange.ts";
 import extractRange from "./kinds/extractRange.ts";
 import type { TableDetails } from "./kinds/extractTable.ts";
 import extractTable from "./kinds/extractTable.ts";
-import type { ViewDetails } from "./kinds/extractView.ts";
-import extractView from "./kinds/extractView.ts";
+// TODO: fix view extraction, also uncomment it in PgType.ts and index.ts when ready
+// import type { ViewDetails } from "./kinds/extractView.ts";
+// import extractView from "./kinds/extractView.ts";
 import fetchTypes from "./kinds/fetchTypes.ts";
 import type { Kind, PgType } from "./kinds/PgType.ts";
-import resolveViewColumns from "./resolveViewColumns.ts";
+// import resolveViewColumns from "./resolveViewColumns.ts";
 import {
 	canonicaliseTypes,
 	CanonicalType,
@@ -37,7 +38,7 @@ interface DetailsMap {
 	table: TableDetails;
 	foreignTable: ForeignTableDetails;
 	materializedView: MaterializedViewDetails;
-	view: ViewDetails;
+	// view: ViewDetails;
 	composite: CompositeTypeDetails;
 	function: FunctionDetails;
 	procedure: ProcedureDetails;
@@ -54,7 +55,7 @@ export type Schema = {
 	ranges: RangeDetails[];
 	tables: TableDetails[];
 	foreignTables: ForeignTableDetails[];
-	views: ViewDetails[];
+	// views: ViewDetails[];
 	materializedViews: MaterializedViewDetails[];
 	composites: CompositeTypeDetails[];
 	functions: FunctionDetails[];
@@ -67,7 +68,7 @@ export type SchemaType =
 	| RangeDetails
 	| TableDetails
 	| ForeignTableDetails
-	| ViewDetails
+	// | ViewDetails
 	| MaterializedViewDetails
 	| CompositeTypeDetails
 	| FunctionDetails
@@ -79,7 +80,7 @@ const emptySchema: Omit<Schema, "name"> = {
 	ranges: [],
 	tables: [],
 	foreignTables: [],
-	views: [],
+	// views: [],
 	materializedViews: [],
 	composites: [],
 	functions: [],
@@ -97,7 +98,7 @@ const populatorMap: { [K in Kind]: Populator<K> } = {
 	range: extractRange,
 	table: extractTable,
 	foreignTable: extractForeignTable,
-	view: extractView,
+	// view: extractView,
 	materializedView: extractMaterializedView,
 	composite: extractCompositeType,
 	function: extractFunction,
@@ -279,9 +280,11 @@ export class Extractor {
 			];
 		}
 
-		const result = options?.resolveViews
-			? resolveViewColumns(schemas)
-			: schemas;
+		const result =
+			//  options?.resolveViews
+			// 	? resolveViewColumns(schemas)
+			// :
+			schemas;
 
 		options?.onProgressEnd?.();
 

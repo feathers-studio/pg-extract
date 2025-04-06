@@ -48,9 +48,9 @@ export type {
 	UpdateAction,
 	updateActionMap,
 } from "./kinds/extractTable.ts";
-export type {
-	ViewColumn,
-	ViewColumnType,
-	ViewDetails,
-} from "./kinds/extractView.ts";
+// export type {
+// 	ViewColumn,
+// 	ViewColumnType,
+// 	ViewDetails,
+// } from "./kinds/extractView.ts";
 export type { Kind, PgType } from "./kinds/PgType.ts";
