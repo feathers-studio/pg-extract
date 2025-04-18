@@ -319,7 +319,7 @@ const extractTable = async (
 	const columnsQuery = await db.query<
 		{
 			name: string;
-			expandedType: string;
+			definedType: string;
 			comment: string | null;
 			defaultValue: any;
 			isNullable: boolean;
@@ -334,7 +334,7 @@ const extractTable = async (
 		[name: string, schemaName: string]
 	>(
 		`
-		WITH 
+		WITH
 		reference_map AS (
 			${referenceMapQueryPart}
 		),
@@ -345,57 +345,47 @@ const extractTable = async (
 			${commentMapQueryPart}
 		)
 		SELECT
-			columns.column_name AS "name",
-			format_type(
-				(CASE 
-					WHEN columns.udt_schema = 'pg_catalog' THEN columns.udt_name 
-					ELSE columns.udt_schema || '.' || columns.udt_name 
-				END)::regtype,
-				columns.character_maximum_length
-			) 
-			|| COALESCE(repeat('[]', (
-				-- Subtract 1 because the first dimension is already in the base type as []
-				SELECT GREATEST(a.attndims - 1, 0)
-				FROM pg_attribute a 
-				JOIN pg_class c ON c.oid = a.attrelid
-				JOIN pg_namespace n ON n.oid = c.relnamespace
-				WHERE c.relname = $1 
-				AND n.nspname = $2
-				AND a.attname = columns.column_name
-			)), '') AS "expandedType",
+			col.column_name AS "name",
+			format_type(attr.atttypid, attr.atttypmod)
+			|| CASE
+				WHEN attr.attndims > 1 THEN repeat('[]', attr.attndims - 1)
+				ELSE ''
+			END AS "definedType",
 			comment_map.comment AS "comment",
-			column_default AS "defaultValue", 
-			is_nullable = 'YES' AS "isNullable", 
-			is_identity = 'YES' AS "isIdentity", 
-			is_updatable = 'YES' AS "isUpdatable", 
-			ordinal_position AS "ordinalPosition", 
-			CASE WHEN is_identity = 'YES' THEN
-				identity_generation
-			ELSE
-				is_generated
+			col.column_default AS "defaultValue",
+			col.is_nullable = 'YES' AS "isNullable",
+			col.is_identity = 'YES' AS "isIdentity",
+			col.is_updatable = 'YES' AS "isUpdatable",
+			col.ordinal_position AS "ordinalPosition",
+			CASE
+				WHEN col.is_identity = 'YES' THEN col.identity_generation
+				ELSE col.is_generated
 			END AS "generated",
-			COALESCE(index_map.is_primary, FALSE) AS "isPrimaryKey", 
-			COALESCE(reference_map.references, '[]'::json) AS "references", 
-			row_to_json(columns.*) AS "informationSchemaValue"
+			COALESCE(index_map.is_primary, FALSE) AS "isPrimaryKey",
+			COALESCE(reference_map.references, '[]'::json) AS "references",
+			row_to_json(col.*) AS "informationSchemaValue"
 		FROM
-			information_schema.columns
-			LEFT JOIN pg_type t ON columns.udt_name::regtype = t.oid
-			LEFT JOIN index_map ON index_map.column_name = columns.column_name
-			LEFT JOIN reference_map ON reference_map.column_name = columns.column_name
-			LEFT JOIN comment_map ON comment_map.column_name = columns.column_name
+			information_schema.columns col
+			JOIN pg_class c ON col.table_name = c.relname
+			JOIN pg_namespace n ON c.relnamespace = n.oid AND col.table_schema = n.nspname
+			JOIN pg_attribute attr ON c.oid = attr.attrelid AND col.column_name = attr.attname
+			LEFT JOIN index_map ON index_map.column_name = col.column_name
+			LEFT JOIN reference_map ON reference_map.column_name = col.column_name
+			LEFT JOIN comment_map ON comment_map.column_name = col.column_name
 		WHERE
-			table_name = $1
-			AND table_schema = $2
-		ORDER BY ordinal_position;
+			col.table_name = $1
+			AND col.table_schema = $2
+			AND NOT attr.attisdropped
+		ORDER BY col.ordinal_position;
 	`,
 		[table.name, table.schemaName],
 	);
 
 	// Get the expanded type names from the query result
-	const expandedTypes = columnsQuery.map(row => row.expandedType);
+	const definedTypes = columnsQuery.map(row => row.definedType);
 
 	// Use canonicaliseTypes to get detailed type information
-	const canonicalTypes = await canonicaliseTypes(db, expandedTypes);
+	const canonicalTypes = await canonicaliseTypes(db, definedTypes);
 
 	// Combine the column information with the canonical type information
 	const columns = columnsQuery.map((row: any, index: number) => ({

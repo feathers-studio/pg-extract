@@ -8,7 +8,7 @@ class DbAdapter {
 		if (this.client instanceof Pg) {
 			return this.client.connect();
 		} else if (this.client instanceof Pglite) {
-			// The Pglite client doesn't have a connect method
+			// Pglite doesn't have an explicit connect method
 		}
 	}
 
@@ -43,8 +43,7 @@ class DbAdapter {
 		if (this.client instanceof Pg) {
 			await this.client.end();
 		} else if (this.client instanceof Pglite) {
-			// Because it can't be opened, let's leave it open
-			// await this.client.close();
+			await this.client.close();
 		}
 	}
 }
