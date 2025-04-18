@@ -31,41 +31,15 @@ You give it a [postgres connection config object](https://node-postgres.com/apis
 import { Extractor } from "pg-extract";
 
 const extractor = new Extractor({
-  host: "localhost",
-  database: "postgres",
-  user: "postgres",
-  password: "postgres",
+	host: "localhost",
+	database: "postgres",
+	user: "postgres",
+	password: "postgres",
 });
 
 const result = await extractor.extractSchemas();
 
 console.log(result);
-```
-
-For an example of a generated object, take a look at [dvdrental.json](./dvdrental.json) file which is generated from the [sample Database](https://www.postgresqltutorial.com/postgresql-sample-database/) from [PostgreSQLTutorial.com](https://www.postgresqltutorial.com).
-
-## CLI Usage
-
-You can also use the CLI to extract the schemas from a database and write it to the console or a file in JSON format.
-
-```bash
-# Or bunx / pnpm dlx
-npx pg-extract -h localhost -p 5432 -U postgres -d postgres > schemas.json
-```
-
-```
-Usage: pg-extract [options] [DBNAME]
-
-Extract all schemas from a PostgreSQL database and print them as JSON.
-
-Options:
-    --help                      show this help
-    -h, --host=HOSTNAME         database server host or socket directory
-    -p, --port=PORT             database server port
-    -U, --username=USERNAME     database user name
-    -d, --dbname=DBNAME         database name to connect to
-    -n, --schema=SCHEMA         include schema regular expression (may be given multiple times)
-    -N, --exclude-schema=SCHEMA exclude schema regular expression (may be given multiple times)
 ```
 
 ---
