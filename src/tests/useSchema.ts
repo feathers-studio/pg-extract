@@ -1,7 +1,9 @@
 import { DbAdapter } from "../adapter.ts";
 import { afterEach, beforeEach } from "vitest";
 
-const useSchema = (getDb: () => DbAdapter, schemaName: string): void => {
+const useTestSchema = (getDb: () => DbAdapter): string => {
+	const schemaName = `test_${Math.ceil(Math.random() * 1000)}`;
+
 	beforeEach(async () => {
 		const db = getDb();
 		await db.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
@@ -11,6 +13,8 @@ const useSchema = (getDb: () => DbAdapter, schemaName: string): void => {
 		const db = getDb();
 		await db.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`);
 	});
+
+	return schemaName;
 };
 
-export default useSchema;
+export default useTestSchema;

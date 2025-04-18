@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema.ts";
+import useTestSchema from "../tests/useSchema.ts";
 import useTestDbAdapter from "../tests/useTestDbAdapter.ts";
 import extractForeignTable from "./extractForeignTable.ts";
 import type { PgType } from "./PgType.ts";
@@ -18,8 +18,8 @@ const makePgType = (
 // FIXME: this test cannot be run because we use pglite for testing, and pglite does not support postgres_fdw or multiple databases
 describe.skip("extractForeignTable", () => {
 	const [getDbAdapter, databaseName] = useTestDbAdapter();
-	useSchema(getDbAdapter, "test");
-	useSchema(getDbAdapter, "foreign_data");
+	useTestSchema(getDbAdapter, "test");
+	useTestSchema(getDbAdapter, "foreign_data");
 
 	beforeEach(async () => {
 		const db = getDbAdapter();

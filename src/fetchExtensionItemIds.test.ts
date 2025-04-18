@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import fetchExtensionItemIds from "./fetchExtensionItemIds.js";
-import useSchema from "./tests/useSchema.js";
+import useTestSchema from "./tests/useSchema.js";
 import useTestDbAdapter from "./tests/useTestDbAdapter.js";
 
 interface PgClass {
@@ -18,7 +18,7 @@ interface PgProc {
 
 describe.skip("fetchExtensionItemIds", () => {
 	const [getDbAdapter] = useTestDbAdapter();
-	useSchema(getDbAdapter, "test");
+	useTestSchema(getDbAdapter);
 
 	// NOTE: be aware that this test depends on specifics of certain Postgres extensions.
 	// If it fails there is a chance that it's because the extensions themselves have changed,

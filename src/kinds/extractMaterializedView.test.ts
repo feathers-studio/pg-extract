@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema.ts";
+import useTestSchema from "../tests/useSchema.ts";
 import useTestDbAdapter from "../tests/useTestDbAdapter.ts";
 import type {
 	MaterializedViewColumn,
@@ -11,7 +11,7 @@ import type { PgType } from "./PgType.ts";
 
 const makePgType = (
 	name: string,
-	schemaName = "test",
+	schemaName: string,
 ): PgType<"materializedView"> => ({
 	schemaName,
 	name,
@@ -21,22 +21,22 @@ const makePgType = (
 
 describe("extractMaterializedView", () => {
 	const [getDbAdapter, databaseName] = useTestDbAdapter();
-	useSchema(getDbAdapter, "test");
+	const schemaName = useTestSchema(getDbAdapter);
 
 	it("should extract simplified information", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create materialized view test.test_custom_matview as select 1 as id",
+			`create materialized view ${schemaName}.test_custom_matview as select 1 as id`,
 		);
 
 		const result = await extractMaterializedView(
 			db,
-			makePgType("test_custom_matview"),
+			makePgType("test_custom_matview", schemaName),
 		);
 
 		const expected: MaterializedViewDetails = {
 			name: "test_custom_matview",
-			schemaName: "test",
+			schemaName,
 			kind: "materializedView",
 			comment: null,
 			definition: " SELECT 1 AS id;",
@@ -59,7 +59,7 @@ describe("extractMaterializedView", () => {
 					generated: "NEVER",
 					fakeInformationSchemaValue: {
 						table_catalog: databaseName,
-						table_schema: "test",
+						table_schema: schemaName,
 						table_name: "test_custom_matview",
 						column_name: "id",
 						ordinal_position: 1,
@@ -107,7 +107,7 @@ describe("extractMaterializedView", () => {
 			],
 			fakeInformationSchemaValue: {
 				table_catalog: databaseName,
-				table_schema: "test",
+				table_schema: schemaName,
 				table_name: "test_custom_matview",
 				view_definition: " SELECT 1 AS id;",
 				check_option: "NONE",
@@ -125,15 +125,15 @@ describe("extractMaterializedView", () => {
 	it("should fetch column comments", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create materialized view test.some_materialized_view as select 1 as id",
+			`create materialized view ${schemaName}.some_materialized_view as select 1 as id`,
 		);
 		await db.query(
-			"comment on column test.some_materialized_view.id is 'id column'",
+			`comment on column ${schemaName}.some_materialized_view.id is 'id column'`,
 		);
 
 		const result = await extractMaterializedView(
 			db,
-			makePgType("some_materialized_view"),
+			makePgType("some_materialized_view", schemaName),
 		);
 
 		expect(result.columns[0]!.comment).toBe("id column");
@@ -141,33 +141,37 @@ describe("extractMaterializedView", () => {
 
 	it("should handle domains, composite types, ranges and enums as well as arrays of those", async () => {
 		const db = getDbAdapter();
-		await db.query("create domain test.some_domain as text");
+		await db.query(`create domain ${schemaName}.some_domain as text`);
 		await db.query(
-			"create type test.some_composite as (id integer, name text)",
+			`create type ${schemaName}.some_composite as (id integer, name text)`,
 		);
-		await db.query("create type test.some_range as range(subtype=timestamptz)");
-		await db.query("create type test.some_enum as enum ('a', 'b', 'c')");
+		await db.query(
+			`create type ${schemaName}.some_range as range(subtype=timestamptz)`,
+		);
+		await db.query(
+			`create type ${schemaName}.some_enum as enum ('a', 'b', 'c')`,
+		);
 
 		await db.query(
-			`create table test.some_table (
-        d test.some_domain,
-        c test.some_composite,
-        r test.some_range,
-        e test.some_enum,
-        d_a test.some_domain[],
-        c_a test.some_composite[],
-        r_a test.some_range[],
-        e_a test.some_enum[]
+			`create table ${schemaName}.some_table (
+        d ${schemaName}.some_domain,
+        c ${schemaName}.some_composite,
+        r ${schemaName}.some_range,
+        e ${schemaName}.some_enum,
+        d_a ${schemaName}.some_domain[],
+        c_a ${schemaName}.some_composite[],
+        r_a ${schemaName}.some_range[],
+        e_a ${schemaName}.some_enum[]
     )`,
 		);
 
 		await db.query(
-			"create materialized view test.some_materialized_view as select * from test.some_table",
+			`create materialized view ${schemaName}.some_materialized_view as select * from ${schemaName}.some_table`,
 		);
 
 		const result = await extractMaterializedView(
 			db,
-			makePgType("some_materialized_view"),
+			makePgType("some_materialized_view", schemaName),
 		);
 
 		const actual = result.columns.map(column => ({
@@ -180,62 +184,62 @@ describe("extractMaterializedView", () => {
 		const expected: Partial<MaterializedViewColumn>[] = [
 			{
 				name: "d",
-				expandedType: "test.some_domain",
+				expandedType: `${schemaName}.some_domain`,
 				type: {
-					fullName: "test.some_domain",
+					fullName: `${schemaName}.some_domain`,
 					kind: "domain",
 				},
 				isArray: false,
 			},
 			{
 				name: "c",
-				expandedType: "test.some_composite",
-				type: { fullName: "test.some_composite", kind: "composite" },
+				expandedType: `${schemaName}.some_composite`,
+				type: { fullName: `${schemaName}.some_composite`, kind: "composite" },
 				isArray: false,
 			},
 			{
 				name: "r",
-				expandedType: "test.some_range",
+				expandedType: `${schemaName}.some_range`,
 				type: {
-					fullName: "test.some_range",
+					fullName: `${schemaName}.some_range`,
 					kind: "range",
 				},
 				isArray: false,
 			},
 			{
 				name: "e",
-				expandedType: "test.some_enum",
-				type: { fullName: "test.some_enum", kind: "enum" },
+				expandedType: `${schemaName}.some_enum`,
+				type: { fullName: `${schemaName}.some_enum`, kind: "enum" },
 				isArray: false,
 			},
 			{
 				name: "d_a",
-				expandedType: "test.some_domain[]",
+				expandedType: `${schemaName}.some_domain[]`,
 				type: {
-					fullName: "test.some_domain",
+					fullName: `${schemaName}.some_domain`,
 					kind: "domain",
 				},
 				isArray: true,
 			},
 			{
 				name: "c_a",
-				expandedType: "test.some_composite[]",
-				type: { fullName: "test.some_composite", kind: "composite" },
+				expandedType: `${schemaName}.some_composite[]`,
+				type: { fullName: `${schemaName}.some_composite`, kind: "composite" },
 				isArray: true,
 			},
 			{
 				name: "r_a",
-				expandedType: "test.some_range[]",
+				expandedType: `${schemaName}.some_range[]`,
 				type: {
-					fullName: "test.some_range",
+					fullName: `${schemaName}.some_range`,
 					kind: "range",
 				},
 				isArray: true,
 			},
 			{
 				name: "e_a",
-				expandedType: "test.some_enum[]",
-				type: { fullName: "test.some_enum", kind: "enum" },
+				expandedType: `${schemaName}.some_enum[]`,
+				type: { fullName: `${schemaName}.some_enum`, kind: "enum" },
 				isArray: true,
 			},
 		];

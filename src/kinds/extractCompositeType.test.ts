@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema.ts";
+import useTestSchema from "../tests/useSchema.ts";
 import useTestDbAdapter from "../tests/useTestDbAdapter.ts";
 import type { CompositeTypeDetails } from "./extractCompositeType.ts";
 import extractCompositeType from "./extractCompositeType.ts";
 import type { PgType } from "./PgType.ts";
 import { CanonicalType } from "./query-parts/canonicaliseTypes.ts";
 
-const makePgType = (
-	name: string,
-	schemaName = "test",
-): PgType<"composite"> => ({
+const makePgType = (name: string, schemaName: string): PgType<"composite"> => ({
 	schemaName,
 	name,
 	kind: "composite",
@@ -19,15 +16,17 @@ const makePgType = (
 
 describe("extractCompositeType", () => {
 	const [getDbAdapter] = useTestDbAdapter();
-	useSchema(getDbAdapter, "test");
+	const schemaName = useTestSchema(getDbAdapter);
 
 	it("should extract simplified information", async () => {
 		const db = getDbAdapter();
-		await db.query("create type test.some_composite_type as (id integer)");
+		await db.query(
+			`create type ${schemaName}.some_composite_type as (id integer)`,
+		);
 
 		const result = await extractCompositeType(
 			db,
-			makePgType("some_composite_type"),
+			makePgType("some_composite_type", schemaName),
 		);
 
 		const actual = (result as CompositeTypeDetails).canonical.attributes.map(
@@ -58,15 +57,15 @@ describe("extractCompositeType", () => {
 	it("should fetch column comments", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create type test.some_composite_type as (id integer, name text)",
+			`create type ${schemaName}.some_composite_type as (id integer, name text)`,
 		);
 		await db.query(
-			"comment on column test.some_composite_type.id is 'id column'",
+			`comment on column ${schemaName}.some_composite_type.id is 'id column'`,
 		);
 
 		const result = await extractCompositeType(
 			db,
-			makePgType("some_composite_type"),
+			makePgType("some_composite_type", schemaName),
 		);
 
 		expect(
@@ -76,29 +75,33 @@ describe("extractCompositeType", () => {
 
 	it("should handle domains, composite types, ranges and enums as well as arrays of those", async () => {
 		const db = getDbAdapter();
-		await db.query("create domain test.some_domain as text");
+		await db.query(`create domain ${schemaName}.some_domain as text`);
 		await db.query(
-			"create type test.some_composite as (id integer, name text)",
+			`create type ${schemaName}.some_composite as (id integer, name text)`,
 		);
-		await db.query("create type test.some_range as range(subtype=timestamptz)");
-		await db.query("create type test.some_enum as enum ('a', 'b', 'c')");
+		await db.query(
+			`create type ${schemaName}.some_range as range(subtype=timestamptz)`,
+		);
+		await db.query(
+			`create type ${schemaName}.some_enum as enum ('a', 'b', 'c')`,
+		);
 
 		await db.query(
-			`create type test.some_composite_type as (
-		d test.some_domain,
-		c test.some_composite,
-		r test.some_range,
-		e test.some_enum,
-		d_a test.some_domain[],
-		c_a test.some_composite[],
-		r_a test.some_range[],
-		e_a test.some_enum[]
+			`create type ${schemaName}.some_composite_type as (
+		d ${schemaName}.some_domain,
+		c ${schemaName}.some_composite,
+		r ${schemaName}.some_range,
+		e ${schemaName}.some_enum,
+		d_a ${schemaName}.some_domain[],
+		c_a ${schemaName}.some_composite[],
+		r_a ${schemaName}.some_range[],
+		e_a ${schemaName}.some_enum[]
 	)`,
 		);
 
 		const result = await extractCompositeType(
 			db,
-			makePgType("some_composite_type"),
+			makePgType("some_composite_type", schemaName),
 		);
 
 		const actual = (result as CompositeTypeDetails).canonical.attributes.map(
@@ -116,7 +119,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "d",
 				type: {
-					canonical_name: "test.some_domain",
+					canonical_name: `${schemaName}.some_domain`,
 					kind: CanonicalType.TypeKind.Domain,
 					dimensions: 0,
 				},
@@ -124,7 +127,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "c",
 				type: {
-					canonical_name: "test.some_composite",
+					canonical_name: `${schemaName}.some_composite`,
 					kind: CanonicalType.TypeKind.Composite,
 					dimensions: 0,
 				},
@@ -132,7 +135,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "r",
 				type: {
-					canonical_name: "test.some_range",
+					canonical_name: `${schemaName}.some_range`,
 					kind: CanonicalType.TypeKind.Range,
 					dimensions: 0,
 				},
@@ -140,7 +143,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "e",
 				type: {
-					canonical_name: "test.some_enum",
+					canonical_name: `${schemaName}.some_enum`,
 					kind: CanonicalType.TypeKind.Enum,
 					dimensions: 0,
 				},
@@ -148,7 +151,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "d_a",
 				type: {
-					canonical_name: "test.some_domain",
+					canonical_name: `${schemaName}.some_domain`,
 					kind: CanonicalType.TypeKind.Domain,
 					dimensions: 1,
 				},
@@ -156,7 +159,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "c_a",
 				type: {
-					canonical_name: "test.some_composite",
+					canonical_name: `${schemaName}.some_composite`,
 					kind: CanonicalType.TypeKind.Composite,
 					dimensions: 1,
 				},
@@ -164,7 +167,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "r_a",
 				type: {
-					canonical_name: "test.some_range",
+					canonical_name: `${schemaName}.some_range`,
 					kind: CanonicalType.TypeKind.Range,
 					dimensions: 1,
 				},
@@ -172,7 +175,7 @@ describe("extractCompositeType", () => {
 			{
 				name: "e_a",
 				type: {
-					canonical_name: "test.some_enum",
+					canonical_name: `${schemaName}.some_enum`,
 					kind: CanonicalType.TypeKind.Enum,
 					dimensions: 1,
 				},

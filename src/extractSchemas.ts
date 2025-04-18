@@ -20,7 +20,7 @@ import type { RangeDetails } from "./kinds/extractRange.ts";
 import extractRange from "./kinds/extractRange.ts";
 import type { TableDetails } from "./kinds/extractTable.ts";
 import extractTable from "./kinds/extractTable.ts";
-// TODO: fix view extraction, also uncomment it in PgType.ts and index.ts when ready
+// TODO: fix view extraction, also uncomment it in PgType.ts, index.ts, fetchTypes.test.ts
 // import type { ViewDetails } from "./kinds/extractView.ts";
 // import extractView from "./kinds/extractView.ts";
 import fetchTypes from "./kinds/fetchTypes.ts";

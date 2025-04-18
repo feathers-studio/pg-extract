@@ -16,12 +16,13 @@ const useTestDbAdapter = (): readonly [() => DbAdapter, string] => {
 
 	beforeAll(async () => {
 		dbAdapter = new DbAdapter(pglite);
-		console.log("created database", database);
+		await dbAdapter.connect();
+		console.log("[before] created database", database);
 	});
 
 	afterAll(async () => {
 		await dbAdapter.close();
-		console.log("closed database", database);
+		console.log("[after] closed database", database);
 	});
 
 	return [() => dbAdapter, database] as const;

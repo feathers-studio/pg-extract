@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema.ts";
+import useTestSchema from "../tests/useSchema.ts";
 import type {
 	ColumnReference,
 	TableCheck,
@@ -13,7 +13,7 @@ import type { PgType } from "./PgType.ts";
 import { CanonicalType } from "./query-parts/canonicaliseTypes.ts";
 import useTestDbAdapter from "../tests/useTestDbAdapter.ts";
 
-const makePgType = (name: string, schemaName = "test"): PgType<"table"> => ({
+const makePgType = (name: string, schemaName: string): PgType<"table"> => ({
 	schemaName,
 	name,
 	kind: "table",
@@ -23,22 +23,22 @@ const makePgType = (name: string, schemaName = "test"): PgType<"table"> => ({
 // const test = testWith({ schemaNames: ['test'] });
 describe("extractTable", () => {
 	const [getDbAdapter, databaseName] = useTestDbAdapter();
-	useSchema(getDbAdapter, "test");
+	const schemaName = useTestSchema(getDbAdapter);
 
 	it("should extract simplified as well as full information_schema information", async () => {
 		const db = getDbAdapter();
-		await db.query("create table test.some_table (id integer)");
+		await db.query(`create table ${schemaName}.some_table (id integer)`);
 
-		const result = await extractTable(db, makePgType("some_table"));
+		const result = await extractTable(db, makePgType("some_table", schemaName));
 
 		const expected: TableDetails = {
 			name: "some_table",
-			schemaName: "test",
+			schemaName,
 			kind: "table",
 			comment: null,
 			informationSchemaValue: {
 				table_catalog: databaseName,
-				table_schema: "test",
+				table_schema: schemaName,
 				table_name: "some_table",
 				table_type: "BASE TABLE",
 				self_referencing_column_name: null,
@@ -62,12 +62,6 @@ describe("extractTable", () => {
 						name: "int4",
 						dimensions: 0,
 						original_type: "integer",
-						modifiers: null,
-						// @ts-expect-error union type issue
-						domain_base_type: null,
-						range_subtype: null,
-						enum_values: null,
-						attributes: null,
 					},
 					references: [],
 					defaultValue: null,
@@ -81,7 +75,7 @@ describe("extractTable", () => {
 
 					informationSchemaValue: {
 						table_catalog: databaseName,
-						table_schema: "test",
+						table_schema: schemaName,
 						table_name: "some_table",
 						column_name: "id",
 						ordinal_position: 1,
@@ -137,10 +131,12 @@ describe("extractTable", () => {
 
 	it("should fetch column comments", async () => {
 		const db = getDbAdapter();
-		await db.query("create table test.some_table (id integer)");
-		await db.query("comment on column test.some_table.id is 'id column'");
+		await db.query(`create table ${schemaName}.some_table (id integer)`);
+		await db.query(
+			`comment on column ${schemaName}.some_table.id is 'id column'`,
+		);
 
-		const result = await extractTable(db, makePgType("some_table"));
+		const result = await extractTable(db, makePgType("some_table", schemaName));
 
 		expect(result.columns[0]!.comment).toBe("id column");
 	});
@@ -148,10 +144,10 @@ describe("extractTable", () => {
 	it("should handle arrays of primitive types", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create table test.some_table (normal_int integer, array_of_ints integer[], array_of_strings text[], two_dimensional_array integer[][])",
+			`create table ${schemaName}.some_table (normal_int integer, array_of_ints integer[], array_of_strings text[], two_dimensional_array integer[][])`,
 		);
 
-		const result = await extractTable(db, makePgType("some_table"));
+		const result = await extractTable(db, makePgType("some_table", schemaName));
 
 		const actual = result.columns.map(column => ({
 			name: column.name,
@@ -191,14 +187,17 @@ describe("extractTable", () => {
 
 	it("should fetch table checks", async () => {
 		const db = getDbAdapter();
-		await db.query(`create table test.some_table_with_checks (
+		await db.query(`create table ${schemaName}.some_table_with_checks (
 		id integer constraint id_check check (id > 0),
 		products TEXT[],
 		number_of_products INT,
 		constraint products_len_check check (array_length(products, 1) = number_of_products)
 	)`);
 
-		const result = await extractTable(db, makePgType("some_table_with_checks"));
+		const result = await extractTable(
+			db,
+			makePgType("some_table_with_checks", schemaName),
+		);
 		const actual = result.checks;
 
 		const expected: TableCheck[] = [
@@ -214,27 +213,31 @@ describe("extractTable", () => {
 
 	it("should handle domains, composite types, ranges and enums as well as arrays of those", async () => {
 		const db = getDbAdapter();
-		await db.query("create domain test.some_domain as text");
+		await db.query(`create domain ${schemaName}.some_domain as text`);
 		await db.query(
-			"create type test.some_composite as (id integer, name text)",
+			`create type ${schemaName}.some_composite as (id integer, name text)`,
 		);
-		await db.query("create type test.some_range as range(subtype=timestamptz)");
-		await db.query("create type test.some_enum as enum ('a', 'b', 'c')");
+		await db.query(
+			`create type ${schemaName}.some_range as range(subtype=timestamptz)`,
+		);
+		await db.query(
+			`create type ${schemaName}.some_enum as enum ('a', 'b', 'c')`,
+		);
 
 		await db.query(
-			`create table test.some_table (
-				d test.some_domain,
-				c test.some_composite,
-				r test.some_range,
-				e test.some_enum,
-				d_a test.some_domain[],
-				c_a test.some_composite[],
-				r_a test.some_range[],
-				e_a test.some_enum[]
+			`create table ${schemaName}.some_table (
+				d ${schemaName}.some_domain,
+				c ${schemaName}.some_composite,
+				r ${schemaName}.some_range,
+				e ${schemaName}.some_enum,
+				d_a ${schemaName}.some_domain[],
+				c_a ${schemaName}.some_composite[],
+				r_a ${schemaName}.some_range[],
+				e_a ${schemaName}.some_enum[]
 			)`,
 		);
 
-		const result = await extractTable(db, makePgType("some_table"));
+		const result = await extractTable(db, makePgType("some_table", schemaName));
 
 		const actual = result.columns.map(column => ({
 			name: column.name,
@@ -248,35 +251,39 @@ describe("extractTable", () => {
 		const expected: typeof actual = [
 			{
 				name: "d",
-				canonical_name: "test.some_domain",
+				canonical_name: `${schemaName}.some_domain`,
 				kind: CanonicalType.TypeKind.Domain,
 				dimensions: 0,
-				domain_base_type: null,
+				domain_base_type: {
+					canonical_name: "pg_catalog.text",
+					name: "text",
+					schema: "pg_catalog",
+				},
 			},
 			{
 				name: "c",
-				canonical_name: "test.some_composite",
+				canonical_name: `${schemaName}.some_composite`,
 				kind: CanonicalType.TypeKind.Composite,
 				dimensions: 0,
-				domain_base_type: null,
+				domain_base_type: undefined,
 			},
 			{
 				name: "r",
-				canonical_name: "test.some_range",
+				canonical_name: `${schemaName}.some_range`,
 				kind: CanonicalType.TypeKind.Range,
 				dimensions: 0,
-				domain_base_type: null,
+				domain_base_type: undefined,
 			},
 			{
 				name: "e",
-				canonical_name: "test.some_enum",
+				canonical_name: `${schemaName}.some_enum`,
 				kind: CanonicalType.TypeKind.Enum,
 				dimensions: 0,
-				domain_base_type: null,
+				domain_base_type: undefined,
 			},
 			{
 				name: "d_a",
-				canonical_name: "test.some_domain",
+				canonical_name: `${schemaName}.some_domain`,
 				kind: CanonicalType.TypeKind.Domain,
 				dimensions: 1,
 				domain_base_type: {
@@ -287,24 +294,24 @@ describe("extractTable", () => {
 			},
 			{
 				name: "c_a",
-				canonical_name: "test.some_composite",
+				canonical_name: `${schemaName}.some_composite`,
 				kind: CanonicalType.TypeKind.Composite,
 				dimensions: 1,
-				domain_base_type: null,
+				domain_base_type: undefined,
 			},
 			{
 				name: "r_a",
-				canonical_name: "test.some_range",
+				canonical_name: `${schemaName}.some_range`,
 				kind: CanonicalType.TypeKind.Range,
 				dimensions: 1,
-				domain_base_type: null,
+				domain_base_type: undefined,
 			},
 			{
 				name: "e_a",
-				canonical_name: "test.some_enum",
+				canonical_name: `${schemaName}.some_enum`,
 				kind: CanonicalType.TypeKind.Enum,
 				dimensions: 1,
-				domain_base_type: null,
+				domain_base_type: undefined,
 			},
 		];
 
@@ -312,19 +319,25 @@ describe("extractTable", () => {
 	});
 
 	describe("references", () => {
-		useSchema(getDbAdapter, "secondary_schema");
+		const schemaName = useTestSchema(getDbAdapter);
+		const secondarySchemaName = useTestSchema(getDbAdapter);
 
 		it("should extract a simple foreign key", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
 			await db.query(
-				"create table test.linking_table (some_table_id integer references test.some_table(id))",
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
+			await db.query(
+				`create table ${schemaName}.linking_table (some_table_id integer references ${schemaName}.some_table(id))`,
 			);
 
-			const result = await extractTable(db, makePgType("linking_table"));
+			const result = await extractTable(
+				db,
+				makePgType("linking_table", schemaName),
+			);
 
 			const expected: ColumnReference = {
-				schemaName: "test",
+				schemaName,
 				tableName: "some_table",
 				columnName: "id",
 				onDelete: "NO ACTION",
@@ -337,16 +350,19 @@ describe("extractTable", () => {
 		it("should extract a foreign key with a different schema", async () => {
 			const db = getDbAdapter();
 			await db.query(
-				"create table secondary_schema.some_table (id integer primary key)",
+				`create table ${secondarySchemaName}.some_table (id integer primary key)`,
 			);
 			await db.query(
-				"create table test.linking_table (some_table_id integer references secondary_schema.some_table(id))",
+				`create table ${schemaName}.linking_table (some_table_id integer references ${secondarySchemaName}.some_table(id))`,
 			);
 
-			const result = await extractTable(db, makePgType("linking_table"));
+			const result = await extractTable(
+				db,
+				makePgType("linking_table", schemaName),
+			);
 
 			const expected: ColumnReference = {
-				schemaName: "secondary_schema",
+				schemaName: secondarySchemaName,
 				tableName: "some_table",
 				columnName: "id",
 				onDelete: "NO ACTION",
@@ -358,15 +374,20 @@ describe("extractTable", () => {
 
 		it("should get the onDelete and onUpdate actions", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
 			await db.query(
-				"create table test.linking_table (some_table_id integer references test.some_table(id) on delete cascade on update set null)",
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
+			await db.query(
+				`create table ${schemaName}.linking_table (some_table_id integer references ${schemaName}.some_table(id) on delete cascade on update set null)`,
 			);
 
-			const result = await extractTable(db, makePgType("linking_table"));
+			const result = await extractTable(
+				db,
+				makePgType("linking_table", schemaName),
+			);
 
 			const expected: ColumnReference = {
-				schemaName: "test",
+				schemaName,
 				tableName: "some_table",
 				columnName: "id",
 				onDelete: "CASCADE",
@@ -380,10 +401,15 @@ describe("extractTable", () => {
 	describe("indices", () => {
 		it("should extract a simple index", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer)");
-			await db.query("create index some_table_id_idx on test.some_table (id)");
+			await db.query(`create table ${schemaName}.some_table (id integer)`);
+			await db.query(
+				`create index some_table_id_idx on ${schemaName}.some_table (id)`,
+			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableIndex[] = [
 				{
@@ -404,12 +430,15 @@ describe("extractTable", () => {
 
 		it("should extract a unique index", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer)");
+			await db.query(`create table ${schemaName}.some_table (id integer)`);
 			await db.query(
-				"create unique index some_table_id_idx on test.some_table (id)",
+				`create unique index some_table_id_idx on ${schemaName}.some_table (id)`,
 			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableIndex[] = [
 				{
@@ -430,9 +459,14 @@ describe("extractTable", () => {
 
 		it("it should extract a primary key", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
+			await db.query(
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableIndex[] = [
 				{
@@ -453,12 +487,17 @@ describe("extractTable", () => {
 
 		it("should extract a multi-column index", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer, kind integer)");
 			await db.query(
-				"create index some_table_id_idx on test.some_table (id, kind)",
+				`create table ${schemaName}.some_table (id integer, kind integer)`,
+			);
+			await db.query(
+				`create index some_table_id_idx on ${schemaName}.some_table (id, kind)`,
 			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableIndex[] = [
 				{
@@ -483,12 +522,15 @@ describe("extractTable", () => {
 
 		it("should extract a functional index", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer)");
+			await db.query(`create table ${schemaName}.some_table (id integer)`);
 			await db.query(
-				"create index some_table_id_idx on test.some_table (abs(id))",
+				`create index some_table_id_idx on ${schemaName}.some_table (abs(id))`,
 			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableIndex[] = [
 				{
@@ -511,10 +553,17 @@ describe("extractTable", () => {
 	describe("row-level security", () => {
 		it("should extract isRowLevelSecurityEnabled", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
-			await db.query("alter table test.some_table enable row level security");
+			await db.query(
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
+			await db.query(
+				`alter table ${schemaName}.some_table enable row level security`,
+			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			expect(result.isRowLevelSecurityEnabled).toEqual(true);
 			expect(result.isRowLevelSecurityEnforced).toEqual(false);
@@ -522,10 +571,17 @@ describe("extractTable", () => {
 
 		it("should extract isRowLevelSecurityEnforced", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
-			await db.query("alter table test.some_table force row level security");
+			await db.query(
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
+			await db.query(
+				`alter table ${schemaName}.some_table force row level security`,
+			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			expect(result.isRowLevelSecurityEnabled).toEqual(false);
 			expect(result.isRowLevelSecurityEnforced).toEqual(true);
@@ -535,9 +591,14 @@ describe("extractTable", () => {
 	describe("securityPolicies", () => {
 		it("should extract empty array when no policy is defined", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
+			await db.query(
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableSecurityPolicy[] = [];
 			expect(result.securityPolicies).toEqual(expected);
@@ -545,10 +606,15 @@ describe("extractTable", () => {
 
 		it("it should extract a simple security policy", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
-			await db.query("create policy test_policy on test.some_table");
+			await db.query(
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
+			await db.query(`create policy test_policy on ${schemaName}.some_table`);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableSecurityPolicy[] = [
 				{
@@ -565,13 +631,18 @@ describe("extractTable", () => {
 
 		it("it should extract a complex security policy", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
+			await db.query(
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
 			await db.query("create role test_role");
 			await db.query(
-				"create policy test_policy on test.some_table as restrictive for update to test_role, postgres using (id = 1) with check (true)",
+				`create policy test_policy on ${schemaName}.some_table as restrictive for update to test_role, postgres using (id = 1) with check (true)`,
 			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableSecurityPolicy[] = [
 				{
@@ -588,24 +659,31 @@ describe("extractTable", () => {
 	});
 
 	describe("bugfixes", () => {
+		const secondarySchemaName = useTestSchema(getDbAdapter);
+
 		it("should not report duplicate columns when a column has multiple foreign key constraints", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer primary key)");
 			await db.query(
-				`create table test.linking_table (
+				`create table ${schemaName}.some_table (id integer primary key)`,
+			);
+			await db.query(
+				`create table ${schemaName}.linking_table (
 		  some_table_id integer,
-		  constraint "fk_1" foreign key ("some_table_id") references test.some_table(id),
-		  constraint "fk_2" foreign key ("some_table_id") references test.some_table(id)
+		  constraint "fk_1" foreign key ("some_table_id") references ${schemaName}.some_table(id),
+		  constraint "fk_2" foreign key ("some_table_id") references ${schemaName}.some_table(id)
 		)`,
 			);
 
-			const result = await extractTable(db, makePgType("linking_table"));
+			const result = await extractTable(
+				db,
+				makePgType("linking_table", schemaName),
+			);
 
 			expect(result.columns).toHaveLength(1);
 
 			expect(result.columns[0]!.references).toStrictEqual([
 				{
-					schemaName: "test",
+					schemaName,
 					tableName: "some_table",
 					columnName: "id",
 					onDelete: "NO ACTION",
@@ -613,7 +691,7 @@ describe("extractTable", () => {
 					name: "fk_1",
 				},
 				{
-					schemaName: "test",
+					schemaName,
 					tableName: "some_table",
 					columnName: "id",
 					onDelete: "NO ACTION",
@@ -625,15 +703,21 @@ describe("extractTable", () => {
 
 		it("should not extract indices from another schema", async () => {
 			const db = getDbAdapter();
-			await db.query("create table test.some_table (id integer)");
-			await db.query("create index some_table_id_idx on test.some_table (id)");
-			await db.query("create schema test2");
-			await db.query("create table test2.some_table (id integer)");
+			await db.query(`create table ${schemaName}.some_table (id integer)`);
 			await db.query(
-				"create index some_table_id_idx2 on test2.some_table (id)",
+				`create index some_table_id_idx on ${schemaName}.some_table (id)`,
+			);
+			await db.query(
+				`create table ${secondarySchemaName}.some_table (id integer)`,
+			);
+			await db.query(
+				`create index some_table_id_idx2 on ${secondarySchemaName}.some_table (id)`,
 			);
 
-			const result = await extractTable(db, makePgType("some_table"));
+			const result = await extractTable(
+				db,
+				makePgType("some_table", schemaName),
+			);
 
 			const expected: TableIndex[] = [
 				{

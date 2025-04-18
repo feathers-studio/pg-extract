@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { InformationSchemaRoutine } from "../information_schema/InformationSchemaRoutine.ts";
-import useSchema from "../tests/useSchema.ts";
+import useTestSchema from "../tests/useSchema.ts";
 import useTestDbAdapter from "../tests/useTestDbAdapter.ts";
 import type { FunctionDetails } from "./extractFunction.ts";
 import extractFunction, { FunctionReturnTypeKind } from "./extractFunction.ts";
 import type { PgType } from "./PgType.ts";
 import { CanonicalType } from "./query-parts/canonicaliseTypes.ts";
 
-const makePgType = (name: string, schemaName = "test"): PgType<"function"> => ({
+const makePgType = (name: string, schemaName: string): PgType<"function"> => ({
 	schemaName,
 	name,
 	kind: "function",
@@ -17,18 +17,21 @@ const makePgType = (name: string, schemaName = "test"): PgType<"function"> => ({
 
 describe("extractFunction", () => {
 	const [getDbAdapter] = useTestDbAdapter();
-	useSchema(getDbAdapter, "test");
+	const schemaName = useTestSchema(getDbAdapter);
 
 	it("should extract function details", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create function test.some_function() returns text as $$ BEGIN return 'hello'; END; $$ language plpgsql",
+			`create function ${schemaName}.some_function() returns text as $$ BEGIN return 'hello'; END; $$ language plpgsql`,
 		);
 
-		const result = await extractFunction(db, makePgType("some_function"));
+		const result = await extractFunction(
+			db,
+			makePgType("some_function", schemaName),
+		);
 
 		const expected: FunctionDetails = {
-			schemaName: "test",
+			schemaName,
 			name: "some_function",
 			kind: "function",
 			comment: null,
@@ -55,8 +58,8 @@ describe("extractFunction", () => {
 			estimatedCost: 100,
 			estimatedRows: null,
 			informationSchemaValue: {
-				specific_schema: "test",
-				routine_schema: "test",
+				specific_schema: schemaName,
+				routine_schema: schemaName,
 				routine_name: "some_function",
 				routine_type: "FUNCTION",
 				module_catalog: null,
@@ -141,13 +144,16 @@ describe("extractFunction", () => {
 	it("should extract function details with arguments", async () => {
 		const db = getDbAdapter();
 		await db.query(
-			"create function test.some_function(text) returns text as $$ BEGIN return $1; END; $$ language plpgsql",
+			`create function ${schemaName}.some_function(text) returns text as $$ BEGIN return $1; END; $$ language plpgsql`,
 		);
 
-		const result = await extractFunction(db, makePgType("some_function"));
+		const result = await extractFunction(
+			db,
+			makePgType("some_function", schemaName),
+		);
 
 		const expected: Partial<FunctionDetails> = {
-			schemaName: "test",
+			schemaName,
 			name: "some_function",
 			kind: "function",
 			comment: null,
@@ -188,7 +194,7 @@ describe("extractFunction", () => {
 	it("should handle different parameter modes", async () => {
 		const db = getDbAdapter();
 		await db.query(`
-	  create function test.param_modes(
+	  create function ${schemaName}.param_modes(
 		IN in_param text,
 		OUT out_param text,
 		INOUT inout_param int,
@@ -200,7 +206,10 @@ describe("extractFunction", () => {
 	  END;
 	  $$ language plpgsql`);
 
-		const result = await extractFunction(db, makePgType("param_modes"));
+		const result = await extractFunction(
+			db,
+			makePgType("param_modes", schemaName),
+		);
 
 		expect(
 			result[0]!.parameters.map(p => ({
@@ -235,16 +244,18 @@ describe("extractFunction", () => {
 	it("should handle complex return types", async () => {
 		const db = getDbAdapter();
 
-		await db.query(`create type test.complex_type as (id int, name text);`);
+		await db.query(
+			`create type ${schemaName}.complex_type as (id int, name text);`,
+		);
 
 		await db.query(`
-			create function test.returns_complex()
+			create function ${schemaName}.returns_complex()
 			returns table(
 				id integer,
 				name text,
 				tags text[],
 				metadata json,
-				complex test.complex_type
+				complex ${schemaName}.complex_type
 			) as $$
 			BEGIN
 				-- Function body
@@ -252,7 +263,10 @@ describe("extractFunction", () => {
 			$$ language plpgsql
 		`);
 
-		const result = await extractFunction(db, makePgType("returns_complex"));
+		const result = await extractFunction(
+			db,
+			makePgType("returns_complex", schemaName),
+		);
 		const returnType = result[0]!.returnType;
 		const columns =
 			returnType.kind === FunctionReturnTypeKind.Table
@@ -271,14 +285,14 @@ describe("extractFunction", () => {
 			{ name: "name", type: "pg_catalog.text", dimensions: 0 },
 			{ name: "tags", type: "pg_catalog.text", dimensions: 1 },
 			{ name: "metadata", type: "pg_catalog.json", dimensions: 0 },
-			{ name: "complex", type: "test.complex_type", dimensions: 0 },
+			{ name: "complex", type: `${schemaName}.complex_type`, dimensions: 0 },
 		]);
 	});
 
 	it("should handle function attributes", async () => {
 		const db = getDbAdapter();
 		await db.query(`
-	  create function test.with_attributes()
+	  create function ${schemaName}.with_attributes()
 	  returns void
 	  language plpgsql
 	  strict
@@ -293,7 +307,10 @@ describe("extractFunction", () => {
 	  END;
 	  $$`);
 
-		const result = await extractFunction(db, makePgType("with_attributes"));
+		const result = await extractFunction(
+			db,
+			makePgType("with_attributes", schemaName),
+		);
 
 		expect(result[0]).toMatchObject({
 			isStrict: true,

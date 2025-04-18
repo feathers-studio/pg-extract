@@ -1,3 +1,5 @@
+// @ts-nocheck Come back to this when views are supported again
+
 import type { Schema } from "./extractSchemas.ts";
 import type {
 	MaterializedViewColumn,

@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { InformationSchemaRoutine } from "../information_schema/InformationSchemaRoutine.ts";
-import useSchema from "../tests/useSchema.ts";
+import useTestSchema from "../tests/useSchema.ts";
 import useTestDbAdapter from "../tests/useTestDbAdapter.ts";
 import type { ProcedureDetails } from "./extractProcedure.ts";
 import extractProcedure from "./extractProcedure.ts";
 import type { PgType } from "./PgType.ts";
 
-const makePgType = (
-	name: string,
-	schemaName = "test",
-): PgType<"procedure"> => ({
+const makePgType = (name: string, schemaName: string): PgType<"procedure"> => ({
 	schemaName,
 	name,
 	kind: "procedure",
@@ -19,18 +16,21 @@ const makePgType = (
 
 describe("extractProcedure", () => {
 	const [getDb] = useTestDbAdapter();
-	useSchema(getDb, "test");
+	const schemaName = useTestSchema(getDb);
 
 	it("should extract procedure details", async () => {
 		const db = getDb();
 		await db.query(
-			"create procedure test.some_procedure() as $$ begin end $$ language plpgsql",
+			`create procedure ${schemaName}.some_procedure() as $$ begin end $$ language plpgsql`,
 		);
 
-		const result = await extractProcedure(db, makePgType("some_procedure"));
+		const result = await extractProcedure(
+			db,
+			makePgType("some_procedure", schemaName),
+		);
 
 		const expected: ProcedureDetails = {
-			schemaName: "test",
+			schemaName,
 			name: "some_procedure",
 			kind: "procedure",
 			comment: null,
@@ -42,8 +42,8 @@ describe("extractProcedure", () => {
 			parallelSafety: "UNSAFE",
 			estimatedCost: 100,
 			informationSchemaValue: {
-				specific_schema: "test",
-				routine_schema: "test",
+				specific_schema: schemaName,
+				routine_schema: schemaName,
 				routine_name: "some_procedure",
 				routine_type: "PROCEDURE",
 				module_catalog: null,
@@ -129,7 +129,7 @@ describe("extractProcedure", () => {
 	it("should extract procedure details with parameters", async () => {
 		const db = getDb();
 		await db.query(`
-      CREATE PROCEDURE test.some_procedure(
+      CREATE PROCEDURE ${schemaName}.some_procedure(
         IN in_param text,
         OUT out_param text,
         INOUT inout_param int
@@ -143,11 +143,14 @@ describe("extractProcedure", () => {
       END;
       $$`);
 
-		const result = await extractProcedure(db, makePgType("some_procedure"));
+		const result = await extractProcedure(
+			db,
+			makePgType("some_procedure", schemaName),
+		);
 
 		expect(result).toMatchObject({
 			name: "some_procedure",
-			schemaName: "test",
+			schemaName,
 			kind: "procedure",
 			parameters: [
 				{ name: "in_param", mode: "IN", type: "text" },

@@ -1,5 +1,10 @@
 import { DbAdapter } from "../../adapter.ts";
 
+const removeNulls = <T>(o: T): T => {
+	for (const key in o) if (o[key] == null) delete o[key];
+	return o;
+};
+
 export namespace CanonicalType {
 	export enum TypeKind {
 		Base = "base",
@@ -323,14 +328,14 @@ export const canonicaliseTypes = async (
 							}),
 						);
 
-					return {
+					return removeNulls({
 						...each,
 						kind: CanonicalType.TypeKind.Composite,
 						attributes,
-					} satisfies CanonicalType.Composite;
+					}) satisfies CanonicalType.Composite;
 				}
 
-				return each satisfies CanonicalType;
+				return removeNulls(each) satisfies CanonicalType;
 			}),
 	);
 };

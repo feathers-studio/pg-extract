@@ -14,6 +14,11 @@ const parameterModeMap = {
 	t: "TABLE",
 } as const;
 
+const removeNulls = <T>(o: T): T => {
+	for (const key in o) if (o[key] === null) delete o[key];
+	return o;
+};
+
 type ParameterMode = (typeof parameterModeMap)[keyof typeof parameterModeMap];
 
 const INPUT_MODES = ["i", "b", "v"] as (keyof typeof parameterModeMap)[];
@@ -246,7 +251,7 @@ async function extractFunction(
 				parameters,
 				volatility: volatilityMap[row.volatility],
 				parallelSafety: parallelSafetyMap[row.parallel_safety],
-				returnType,
+				returnType: removeNulls(returnType),
 				informationSchemaValue: informationSchemaValue!,
 			};
 

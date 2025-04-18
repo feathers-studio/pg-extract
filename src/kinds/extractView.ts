@@ -1,3 +1,5 @@
+// @ts-nocheck Come back to this when views are supported again
+
 import { DbAdapter } from "../adapter.ts";
 
 import type { InformationSchemaColumn } from "../information_schema/InformationSchemaColumn.ts";

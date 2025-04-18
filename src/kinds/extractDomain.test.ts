@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import useSchema from "../tests/useSchema.ts";
+import useTestSchema from "../tests/useSchema.ts";
 import useTestDbAdapter from "../tests/useTestDbAdapter.ts";
 import type { DomainDetails } from "./extractDomain.ts";
 import extractDomain from "./extractDomain.ts";
 import type { PgType } from "./PgType.ts";
 
-const makePgType = (name: string, schemaName = "test"): PgType<"domain"> => ({
+const makePgType = (name: string, schemaName: string): PgType<"domain"> => ({
 	schemaName,
 	name,
 	kind: "domain",
@@ -15,23 +15,26 @@ const makePgType = (name: string, schemaName = "test"): PgType<"domain"> => ({
 
 describe("extractDomain", () => {
 	const [getDbAdapter, databaseName] = useTestDbAdapter();
-	useSchema(getDbAdapter, "test");
+	const schemaName = useTestSchema(getDbAdapter);
 
 	it("should extract simplified as well as full information_schema information", async () => {
 		const db = getDbAdapter();
-		await db.query("create domain test.some_domain as integer");
+		await db.query(`create domain ${schemaName}.some_domain as integer`);
 
-		const result = await extractDomain(db, makePgType("some_domain"));
+		const result = await extractDomain(
+			db,
+			makePgType("some_domain", schemaName),
+		);
 
 		const expected: DomainDetails = {
 			name: "some_domain",
-			schemaName: "test",
+			schemaName,
 			kind: "domain",
 			comment: null,
 			innerType: "pg_catalog.int4",
 			informationSchemaValue: {
 				domain_catalog: databaseName,
-				domain_schema: "test",
+				domain_schema: schemaName,
 				domain_name: "some_domain",
 				data_type: "integer",
 				character_maximum_length: null,
