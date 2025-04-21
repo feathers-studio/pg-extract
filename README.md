@@ -1,3 +1,8 @@
+> [!WARNING]
+> The relevant parts of this repo were rolled into https://github.com/feathers-studio/true-pg, which was the primary purpose of this project.
+> 
+> This project is no longer maintained.
+
 # Extract Schema from Postgres Database
 
 Reads various metadata from your postgres database and return a Javascript object.
